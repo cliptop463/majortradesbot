@@ -37,13 +37,21 @@ jest.mock('@deriv-com/translations', () => ({
 
 // Minimal Dialog shim that renders children and both action buttons
 jest.mock('@/components/shared_ui/dialog', () => {
-    const Dialog = ({ is_visible, children, confirm_button_text, onConfirm, cancel_button_text, onCancel }: any) => {
+    const Dialog = ({
+        is_visible,
+        children,
+        confirm_button_text,
+        onConfirm,
+        is_confirm_disabled,
+        cancel_button_text,
+        onCancel,
+    }: any) => {
         if (!is_visible) return null;
         return (
             <div data-testid='mock-dialog'>
                 {children}
-                {onConfirm && (
-                    <button data-testid='dialog-confirm' onClick={onConfirm}>
+                {confirm_button_text && (
+                    <button data-testid='dialog-confirm' onClick={onConfirm} disabled={is_confirm_disabled}>
                         {confirm_button_text}
                     </button>
                 )}
@@ -129,8 +137,11 @@ describe('DigitScannerModal', () => {
         });
 
         expect(screen.getByTestId('dt_digit_scanner_ranked_row_R_100')).toBeTruthy();
-        // Heuristic disclaimer must be visible
-        expect(screen.getByText(/Heuristic score is not a win probability/)).toBeTruthy();
+        expect(screen.getByText(/Heuristic score \(not a win probability\)/)).toBeTruthy();
+        expect(screen.getByText(/Heuristics describe past noise only/)).toBeTruthy();
+        fireEvent.click(screen.getByLabelText('Expand strategies'));
+        expect(screen.getByText('Matches 5')).toBeTruthy();
+        expect(screen.getByText('digit 5 appears 12%')).toBeTruthy();
     });
 
     it('shows excluded markets with their status reasons', async () => {
@@ -153,6 +164,45 @@ describe('DigitScannerModal', () => {
             expect(screen.getByText('Insufficient data')).toBeTruthy();
             expect(screen.getByText(/Insufficient data: 150/)).toBeTruthy();
         });
+    });
+
+    it('shows skipped markets with the reason they were excluded', async () => {
+        (ApiHelpers.instance.active_symbols.retrieveActiveSymbols as jest.Mock).mockResolvedValue([{}]);
+        (selectVolatilityMarkets as jest.Mock).mockReturnValue({
+            markets: [{}],
+            skipped: [{ symbol: 'R_25', displayName: 'Volatility 25 Index', reason: 'Market closed' }],
+        });
+        (scanMarkets as jest.Mock).mockResolvedValue([makeAnalysis()]);
+        (rankMarkets as jest.Mock).mockReturnValue(makeRanking([makeAnalysis()]));
+
+        render(<DigitScannerModal {...defaultProps} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+
+        expect(await screen.findByText('Market closed')).toBeTruthy();
+        expect(screen.getByText('R_25')).toBeTruthy();
+    });
+
+    it('shows connection errors for individual markets in the excluded list', async () => {
+        const failedMarket = makeAnalysis({
+            symbol: 'R_200',
+            displayName: 'Volatility 200 Index',
+            status: 'error',
+            recommendation: null,
+            message: 'Connection error for R_200',
+            strategies: [],
+        });
+        setupScanMocks([failedMarket]);
+
+        render(<DigitScannerModal {...defaultProps} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+
+        expect(await screen.findByText('Connection error for R_200')).toBeTruthy();
     });
 
     it('shows error message when scan throws', async () => {
@@ -196,6 +246,7 @@ describe('DigitScannerModal', () => {
         await waitFor(() => {
             expect(screen.getByTestId('dt_digit_scanner_confirm_dialog')).toBeTruthy();
         });
+        expect(applyScannerPick).not.toHaveBeenCalled();
 
         // Before/after preview should be visible
         expect(screen.getByText('R_50')).toBeTruthy();
@@ -232,7 +283,7 @@ describe('DigitScannerModal', () => {
         expect(screen.queryByTestId('dt_digit_scanner_confirm_dialog')).toBeNull();
     });
 
-    it('calls applyScannerPick (not run_panel.onRunButtonClick) on Apply', async () => {
+    it('waits for Apply to bot before applying and never runs the bot', async () => {
         setupScanMocks();
         (previewScannerPick as jest.Mock).mockReturnValue({
             ok: true,
@@ -248,6 +299,8 @@ describe('DigitScannerModal', () => {
         });
 
         const onApplied = jest.fn();
+        const runButtonClick = jest.fn();
+        (window as any).run_panel = { onRunButtonClick: runButtonClick };
         render(<DigitScannerModal {...defaultProps} onApplied={onApplied} />);
 
         await act(async () => {
@@ -263,6 +316,7 @@ describe('DigitScannerModal', () => {
         await waitFor(() => {
             expect(screen.getByTestId('dt_digit_scanner_confirm_dialog')).toBeTruthy();
         });
+        expect(applyScannerPick).not.toHaveBeenCalled();
 
         await act(async () => {
             fireEvent.click(screen.getByTestId('dialog-confirm'));
@@ -273,8 +327,7 @@ describe('DigitScannerModal', () => {
             expect(onApplied).toHaveBeenCalledTimes(1);
         });
 
-        // run_panel.onRunButtonClick is NEVER called — no such call should exist
-        expect((window as any).run_panel?.onRunButtonClick).toBeUndefined();
+        expect(runButtonClick).not.toHaveBeenCalled();
     });
 
     it('disables Apply and shows warning when is_running is true', async () => {
@@ -305,8 +358,9 @@ describe('DigitScannerModal', () => {
         // Warning text must be visible
         expect(screen.getByTestId('dt_digit_scanner_bot_running_warning')).toBeTruthy();
 
-        // Apply button click should NOT call applyScannerPick (onConfirm is undefined when running)
+        // The Apply button is disabled while running.
         const confirmBtn = screen.queryByTestId('dialog-confirm');
+        expect(confirmBtn).toBeDisabled();
         if (confirmBtn) fireEvent.click(confirmBtn);
 
         expect(applyScannerPick).not.toHaveBeenCalled();

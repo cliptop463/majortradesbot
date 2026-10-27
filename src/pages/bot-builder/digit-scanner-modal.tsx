@@ -4,6 +4,7 @@ import { ApiHelpers } from '@/external/bot-skeleton';
 import Dialog from '@/components/shared_ui/dialog';
 import { localize } from '@deriv-com/translations';
 import { fetchHistory, scanMarkets, selectVolatilityMarkets } from '@/utils/digit-scanner/scan';
+import type { SkippedMarket } from '@/utils/digit-scanner/scan';
 import { rankMarkets } from '@/utils/digit-scanner/ensemble';
 import type { MarketAnalysis, RankingResult, RankedMarket, StrategyResult } from '@/utils/digit-scanner/types';
 import { previewScannerPick, applyScannerPick } from '@/utils/blockly-scanner-pick';
@@ -103,6 +104,15 @@ const RankedRow: React.FC<{
                         {expanded ? '▼' : '▶'}
                     </button>
                     #{ranked.rank} {analysis.displayName}
+                    <span
+                        style={{
+                            display: 'block',
+                            fontSize: '1rem',
+                            color: 'var(--text-less-prominent)',
+                        }}
+                    >
+                        {analysis.symbol}
+                    </span>
                 </td>
                 <td style={{ padding: '0.6rem 0.8rem' }}>
                     <strong>{directionLabel(recommendation.direction)}</strong> digit{' '}
@@ -222,26 +232,62 @@ const ExcludedRow: React.FC<{ analysis: MarketAnalysis }> = ({ analysis }) => {
     );
 };
 
+const SkippedRow: React.FC<{ market: SkippedMarket }> = ({ market }) => (
+    <tr style={{ background: 'var(--general-section-1)', opacity: 0.7 }}>
+        <td style={{ padding: '0.5rem 0.8rem' }}>
+            {market.displayName}
+            <span style={{ display: 'block', fontSize: '1rem', color: 'var(--text-less-prominent)' }}>
+                {market.symbol}
+            </span>
+        </td>
+        <td style={{ padding: '0.5rem 0.8rem' }} colSpan={2}>
+            <StatusBadge status='skipped' />
+            <span style={{ marginLeft: '0.6rem', fontSize: '1.1rem', color: 'var(--text-less-prominent)' }}>
+                {market.reason}
+            </span>
+        </td>
+        <td colSpan={2} />
+    </tr>
+);
+
 const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_running }) => {
     const [scan_status, setScanStatus] = React.useState<ScanStatus>('idle');
     const [error_msg, setErrorMsg] = React.useState('');
     const [ranking, setRanking] = React.useState<RankingResult | null>(null);
+    const [skippedMarkets, setSkippedMarkets] = React.useState<SkippedMarket[]>([]);
     const [confirm_state, setConfirmState] = React.useState<ConfirmState>(null);
     const [apply_error, setApplyError] = React.useState('');
     const [is_applying, setIsApplying] = React.useState(false);
 
     const handleScan = async () => {
+        if (scan_status === 'scanning') return;
         setScanStatus('scanning');
         setErrorMsg('');
         setRanking(null);
+        setSkippedMarkets([]);
         setApplyError('');
 
         try {
             const apiSymbols = ApiHelpers?.instance?.active_symbols;
-            const rawSymbols = (await apiSymbols?.retrieveActiveSymbols(false)) ?? [];
-            const { markets } = selectVolatilityMarkets(rawSymbols);
+            if (!apiSymbols || typeof apiSymbols.retrieveActiveSymbols !== 'function') {
+                throw new Error(localize('Connection error: active symbols are unavailable.'));
+            }
+            const rawSymbols = await apiSymbols.retrieveActiveSymbols(false);
+            if (apiSymbols.has_initialization_error) {
+                throw new Error(localize('Connection error: unable to load active symbols. Check your connection.'));
+            }
+            if (!Array.isArray(rawSymbols)) {
+                throw new Error(localize('Connection error: active symbols response was invalid.'));
+            }
+            const { markets, skipped } = selectVolatilityMarkets(rawSymbols);
+            setSkippedMarkets(skipped);
 
             if (markets.length === 0) {
+                if (skipped.length > 0) {
+                    setRanking(rankMarkets([]));
+                    setScanStatus('done');
+                    return;
+                }
                 setErrorMsg(localize('No volatility markets available for scanning.'));
                 setScanStatus('error');
                 return;
@@ -304,6 +350,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
         setScanStatus('idle');
         setErrorMsg('');
         setRanking(null);
+        setSkippedMarkets([]);
         setConfirmState(null);
         setApplyError('');
         onClose();
@@ -321,7 +368,8 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                 cancel_button_text={localize('Close')}
                 onCancel={handleClose}
                 confirm_button_text={scan_status === 'scanning' ? localize('Scanning…') : localize('Scan')}
-                onConfirm={scan_status === 'scanning' ? undefined : handleScan}
+                onConfirm={handleScan}
+                is_confirm_disabled={scan_status === 'scanning'}
                 is_mobile_full_width={false}
                 has_close_icon
                 className='digit-scanner-modal'
@@ -391,24 +439,14 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                     style={{ padding: '0.8rem', color: 'var(--text-less-prominent)' }}
                                     data-testid='dt_digit_scanner_no_results'
                                 >
-                                    {localize('No consensus found across any volatility market.')}
+                                    {skippedMarkets.length > 0 && ranking.excluded.length === 0
+                                        ? localize('No open volatility markets were available to scan.')
+                                        : localize('No consensus found across any volatility market.')}
                                 </p>
                             )}
 
                             {ranking.ranked.length > 0 && (
                                 <>
-                                    <p
-                                        style={{
-                                            padding: '0.4rem 0.8rem',
-                                            fontSize: '1.1rem',
-                                            color: 'var(--text-less-prominent)',
-                                            fontStyle: 'italic',
-                                        }}
-                                    >
-                                        {localize(
-                                            '⚠️ Heuristic score is not a win probability. Past digit patterns do not guarantee future profits.'
-                                        )}
-                                    </p>
                                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '1.2rem' }}>
                                         <thead>
                                             <tr
@@ -425,10 +463,10 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                                 </th>
                                                 <th style={{ padding: '0.4rem 0.8rem' }}>{localize('Agreement')}</th>
                                                 <th
-                                                    title={localize('Heuristic score — not a win probability')}
+                                                    title={localize('Heuristic score, not a win probability')}
                                                     style={{ padding: '0.4rem 0.8rem' }}
                                                 >
-                                                    {localize('Score ℹ️')}
+                                                    {localize('Heuristic score (not a win probability)')}
                                                 </th>
                                                 <th style={{ padding: '0.4rem 0.8rem' }} />
                                             </tr>
@@ -447,7 +485,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                 </>
                             )}
 
-                            {ranking.excluded.length > 0 && (
+                            {(ranking.excluded.length > 0 || skippedMarkets.length > 0) && (
                                 <>
                                     <p
                                         style={{
@@ -464,12 +502,27 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                             {ranking.excluded.map(a => (
                                                 <ExcludedRow key={a.symbol} analysis={a} />
                                             ))}
+                                            {skippedMarkets.map(market => (
+                                                <SkippedRow key={market.symbol} market={market} />
+                                            ))}
                                         </tbody>
                                     </table>
                                 </>
                             )}
                         </div>
                     )}
+                    <p
+                        style={{
+                            padding: '0.4rem 0.8rem',
+                            fontSize: '1.1rem',
+                            color: 'var(--text-less-prominent)',
+                            fontStyle: 'italic',
+                        }}
+                    >
+                        {localize(
+                            'Heuristics describe past noise only; they do not imply an edge or guarantee profit.'
+                        )}
+                    </p>
                 </div>
             </Dialog>
 
@@ -479,7 +532,8 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                 title={localize('Apply to bot?')}
                 is_visible={!!confirm_state}
                 confirm_button_text={localize('Apply to bot')}
-                onConfirm={is_running ? undefined : handleApply}
+                onConfirm={handleApply}
+                is_confirm_disabled={is_running || is_applying}
                 cancel_button_text={localize('Cancel')}
                 onCancel={() => {
                     setConfirmState(null);

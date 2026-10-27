@@ -18,6 +18,7 @@ type TDialog = {
     has_close_icon?: boolean;
     is_closed_on_cancel?: boolean;
     is_closed_on_confirm?: boolean;
+    is_confirm_disabled?: boolean;
     is_content_centered?: boolean;
     is_loading?: boolean;
     is_mobile_full_width?: boolean;
@@ -51,6 +52,7 @@ const Dialog = ({
         children,
         confirm_button_text,
         is_loading,
+        is_confirm_disabled,
         is_mobile_full_width = true,
         is_content_centered,
         portal_element_id,
@@ -89,6 +91,7 @@ const Dialog = ({
     };
 
     const handleConfirm = () => {
+        if (is_confirm_disabled) return;
         if (is_closed_on_confirm && enableApp) {
             enableApp();
         }
@@ -192,6 +195,7 @@ const Dialog = ({
                                 has_effect
                                 text={confirm_button_text}
                                 onClick={handleConfirm}
+                                is_disabled={is_confirm_disabled}
                                 primary
                                 large
                             />
