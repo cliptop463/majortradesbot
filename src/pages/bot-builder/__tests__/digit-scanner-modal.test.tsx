@@ -116,6 +116,7 @@ describe('DigitScannerModal', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         (window as any).Blockly = { derivWorkspace: {} };
+        (ApiHelpers.instance.active_symbols as any).has_initialization_error = false;
     });
 
     it('renders idle state with Scan button when first opened', () => {
@@ -220,6 +221,19 @@ describe('DigitScannerModal', () => {
             expect(screen.getByTestId('dt_digit_scanner_error')).toBeTruthy();
             expect(screen.getByText('network timeout')).toBeTruthy();
         });
+    });
+
+    it('shows a connection error when active-symbol initialization fails', async () => {
+        (ApiHelpers.instance.active_symbols.retrieveActiveSymbols as jest.Mock).mockResolvedValue([]);
+        (ApiHelpers.instance.active_symbols as any).has_initialization_error = true;
+
+        render(<DigitScannerModal {...defaultProps} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+
+        expect(await screen.findByText(/Connection error: unable to load active symbols/)).toBeTruthy();
     });
 
     it('opens confirm dialog with before/after preview when a row is selected', async () => {
