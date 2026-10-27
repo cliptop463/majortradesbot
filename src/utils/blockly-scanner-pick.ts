@@ -41,6 +41,8 @@ const BLOCK_TYPES = {
     tradeDefinitionTradeOptions: 'trade_definition_tradeoptions',
 };
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 const getFieldValue = (block: any, fieldName: string): string | number | null => {
     if (!block || typeof block.getFieldValue !== 'function') return null;
     const value = block.getFieldValue(fieldName);
@@ -67,7 +69,7 @@ const waitForFieldPopulation = async (block: any, fieldName: string, timeoutMs =
         if (value !== null && value !== undefined && String(value).trim() !== '') {
             return;
         }
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await sleep(50);
     }
 };
 
@@ -150,12 +152,63 @@ const normalizeDigit = (digit: number) => {
     return digit;
 };
 
-const getPredictionValue = (block: any): string | number | null => {
+const waitForFieldOption = async (
+    block: any,
+    fieldName: string,
+    optionValue: string,
+    timeoutMs = 3000
+): Promise<boolean> => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        const field = block?.getField?.(fieldName);
+        if (field && typeof field.getOptions === 'function') {
+            const options = field.getOptions(false) ?? [];
+            const optionValues = options.flatMap((option: any) => {
+                if (Array.isArray(option)) {
+                    return option.map(value => String(value));
+                }
+                return [String(option)];
+            });
+            if (optionValues.includes(String(optionValue))) {
+                return true;
+            }
+        }
+        await sleep(50);
+    }
+    return false;
+};
+
+const getPredictionBlock = (block: any): any => {
     if (!block) return null;
-    const direct = getFieldValue(block, FIELD_NAMES.prediction);
-    if (direct !== null) return direct;
-    const nested = getFieldValue(block, 'NUM');
-    return nested !== null ? nested : null;
+    const input = block.getInput?.('PREDICTION');
+    if (!input) return null;
+    return block.getInputTargetBlock?.('PREDICTION') ?? null;
+};
+
+const waitForPredictionInput = async (block: any, timeoutMs = 3000): Promise<any> => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        const input = block?.getInput?.('PREDICTION');
+        const target = input ? block.getInputTargetBlock?.('PREDICTION') : null;
+        if (input && target) {
+            return target;
+        }
+        await sleep(50);
+    }
+    return null;
+};
+
+const getPredictionValue = (block: any): string | number | null => {
+    const predictionBlock = getPredictionBlock(block);
+    if (!predictionBlock) return null;
+    return getFieldValue(predictionBlock, 'NUM');
+};
+
+const setPredictionValue = (block: any, value: number): boolean => {
+    const predictionBlock = getPredictionBlock(block);
+    if (!predictionBlock) return false;
+    setFieldValue(predictionBlock, 'NUM', value);
+    return true;
 };
 
 const getContractTypeValue = (block: any): string | number | null => {
@@ -163,6 +216,36 @@ const getContractTypeValue = (block: any): string | number | null => {
     const value = getFieldValue(block, FIELD_NAMES.type);
     if (value !== null) return value;
     return getFieldValue(block, 'TYPE_LIST');
+};
+
+export const ensureMatchesDiffers = async (tradeTypeBlock: any): Promise<ScannerPickFailure | { ok: true }> => {
+    if (!tradeTypeBlock) {
+        return { ok: false, reason: 'Missing trade_definition_tradetype block.' };
+    }
+
+    const categoryBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory);
+    if (String(categoryBefore ?? '').trim() !== 'digits') {
+        const categoryReady = await waitForFieldOption(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory, 'digits');
+        if (!categoryReady) {
+            return { ok: false, reason: 'Digits trade type category is unavailable for this symbol.' };
+        }
+        setFieldValue(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory, 'digits');
+        fireFieldChange(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory, categoryBefore, 'digits');
+        await sleep(100);
+    }
+
+    const tradeTypeBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType);
+    if (String(tradeTypeBefore ?? '').trim() !== 'matchesdiffers') {
+        const tradeTypeReady = await waitForFieldOption(tradeTypeBlock, FIELD_NAMES.tradeType, 'matchesdiffers');
+        if (!tradeTypeReady) {
+            return { ok: false, reason: 'Matches/Differs trade type is unavailable for this symbol.' };
+        }
+        setFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType, 'matchesdiffers');
+        fireFieldChange(tradeTypeBlock, FIELD_NAMES.tradeType, tradeTypeBefore, 'matchesdiffers');
+        await sleep(100);
+    }
+
+    return { ok: true };
 };
 
 export const previewScannerPick = (workspace: any, pick: ScannerPickInput): ScannerPickResult => {
@@ -173,15 +256,7 @@ export const previewScannerPick = (workspace: any, pick: ScannerPickInput): Scan
             return { ok: false, reason: required.reason };
         }
 
-        const { marketBlock, contractTypeBlock, predictionBlock, tradeTypeBlock } = required;
-
-        const currentTradeType = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType);
-        if (currentTradeType !== 'matchesdiffers') {
-            return {
-                ok: false,
-                reason: `Refusing scanner pick: trade type must be matchesdiffers, found ${String(currentTradeType ?? 'missing')}.`,
-            };
-        }
+        const { marketBlock, contractTypeBlock, predictionBlock } = required;
 
         const symbolBefore = getFieldValue(marketBlock, FIELD_NAMES.symbol);
         const typeBefore = getContractTypeValue(contractTypeBlock);
@@ -222,7 +297,7 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
             return { ok: false, reason: required.reason };
         }
 
-        const { marketBlock, contractTypeBlock, predictionBlock } = required;
+        const { marketBlock, contractTypeBlock, predictionBlock, tradeTypeBlock } = required;
 
         const targetType = pick.direction === 'MATCHES' ? 'DIGITMATCH' : 'DIGITDIFF';
         const targetSymbol = pick.symbol;
@@ -238,20 +313,38 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
                 fireFieldChange(marketBlock, FIELD_NAMES.symbol, symbolBefore, targetSymbol);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 250));
+            await sleep(500);
+
+            const categoryState = await ensureMatchesDiffers(tradeTypeBlock);
+            if (!categoryState.ok) {
+                return categoryState;
+            }
+
+            await sleep(250);
 
             const typeBefore = getContractTypeValue(contractTypeBlock);
             if (typeBefore !== targetType) {
+                const contractTypeReady = await waitForFieldOption(contractTypeBlock, FIELD_NAMES.type, targetType);
+                if (!contractTypeReady) {
+                    return {
+                        ok: false,
+                        reason: `Digits/Matches-Differs contract type is unavailable for symbol ${targetSymbol}.`,
+                    };
+                }
                 setFieldValue(contractTypeBlock, FIELD_NAMES.type, targetType);
                 fireFieldChange(contractTypeBlock, FIELD_NAMES.type, typeBefore, targetType);
+                await sleep(200);
             }
 
-            await new Promise(resolve => setTimeout(resolve, 150));
+            const predictionTarget = await waitForPredictionInput(predictionBlock, 3000);
+            if (!predictionTarget) {
+                return { ok: false, reason: 'Prediction input not available for this trade type.' };
+            }
 
             const predictionBefore = getPredictionValue(predictionBlock);
             if (predictionBefore !== targetDigit) {
-                setFieldValue(predictionBlock, FIELD_NAMES.prediction, targetDigit);
-                fireFieldChange(predictionBlock, FIELD_NAMES.prediction, predictionBefore, targetDigit);
+                setPredictionValue(predictionBlock, targetDigit);
+                fireFieldChange(predictionTarget, 'NUM', predictionBefore, targetDigit);
             }
 
             workspace?.render?.();
@@ -274,3 +367,99 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
         };
     }
 };
+
+export { getPredictionValue, setPredictionValue };
+
+export const __testing__ = {
+    waitForFieldOption,
+    waitForPredictionInput,
+    getPredictionBlock,
+};
+
+export default {
+    previewScannerPick,
+    applyScannerPick,
+    ensureMatchesDiffers,
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
