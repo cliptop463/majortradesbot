@@ -1,0 +1,252 @@
+@use 'components/shared/styles/constants' as *;
+
+.digit-scanner-modal,
+.digit-scanner-confirm-modal {
+    .dc-dialog__dialog {
+        width: min(760px, calc(100vw - 2.4rem));
+        max-width: 760px;
+        min-width: 0;
+        max-height: min(80vh, 720px);
+        padding: 2rem 1.6rem 1.2rem;
+        box-sizing: border-box;
+        margin-top: 0;
+    }
+
+    .dc-dialog__content {
+        width: 100%;
+        max-width: none;
+        align-self: stretch;
+        margin-bottom: 0;
+    }
+
+    .dc-dialog__footer {
+        position: sticky;
+        bottom: 0;
+        background: var(--general-main-2);
+        padding-top: 0.8rem;
+        margin-top: 0.8rem;
+        z-index: 1;
+    }
+}
+
+.digit-scanner-modal__content,
+.digit-scanner-confirm-modal__content {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+}
+
+.digit-scanner-modal__results,
+.digit-scanner-confirm-modal__content {
+    width: 100%;
+    min-width: 0;
+}
+
+.digit-scanner-modal__results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.2rem;
+}
+
+.digit-scanner-modal__results-cards {
+    display: none;
+}
+
+.digit-scanner-modal__ranked-card {
+    background: var(--general-section-1);
+    border: 1px solid var(--border-normal);
+    border-radius: 0.8rem;
+    padding: 1.2rem;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    touch-action: pan-y;
+}
+
+.digit-scanner-modal__market-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+}
+
+.digit-scanner-modal__market-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.digit-scanner-modal__market-name {
+    font-weight: 600;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.digit-scanner-modal__market-symbol {
+    font-size: 1rem;
+    color: var(--text-less-prominent);
+    margin-top: 0.2rem;
+    word-break: break-word;
+}
+
+.digit-scanner-modal__market-card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+}
+
+.digit-scanner-modal__card-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.digit-scanner-modal__card-label {
+    font-size: 1rem;
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__select-button,
+.digit-scanner-modal__expand-button {
+    border-radius: 0.6rem;
+    font-size: 1.1rem;
+}
+
+.digit-scanner-modal__select-button {
+    width: 100%;
+    min-height: 4.4rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--button-primary-default);
+    background: transparent;
+    color: var(--button-primary-default);
+    cursor: pointer;
+}
+
+.digit-scanner-modal__expand-button {
+    background: transparent;
+    border: none;
+    color: var(--text-prominent);
+    cursor: pointer;
+    padding: 0.2rem;
+    min-width: 2.8rem;
+    min-height: 2.8rem;
+}
+
+.digit-scanner-modal__strategy-list {
+    border-top: 1px solid var(--border-normal);
+    padding-top: 0.8rem;
+}
+
+.digit-scanner-modal__strategy-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--border-normal);
+}
+
+.digit-scanner-modal__strategy-item:last-child {
+    border-bottom: none;
+}
+
+.digit-scanner-modal__strategy-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 1rem;
+}
+
+.digit-scanner-modal__strategy-row-label {
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__strategy-row-value {
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+    .digit-scanner-modal,
+    .digit-scanner-confirm-modal {
+        .dc-dialog__dialog {
+            width: calc(100vw - 1.6rem);
+            max-width: 100%;
+            min-width: 0;
+            max-height: calc(100dvh - 2rem);
+            height: auto;
+            padding: 1.6rem 1.2rem 1.2rem;
+            border-radius: 1.2rem;
+            margin-top: 0;
+            align-items: stretch;
+            justify-content: flex-start;
+        }
+
+        .dc-dialog__header-wrapper {
+            margin-bottom: 0.8rem;
+        }
+
+        .dc-dialog__content {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            touch-action: pan-y;
+        }
+
+        .dc-dialog__footer {
+            flex-wrap: wrap;
+            justify-content: stretch;
+            gap: 0.8rem;
+            margin-top: 1.2rem;
+        }
+
+        .dc-dialog__button {
+            width: 100%;
+            margin-left: 0;
+            min-height: 4.4rem;
+        }
+    }
+
+    .digit-scanner-modal__results-table {
+        display: none;
+    }
+
+    .digit-scanner-modal__results-cards {
+        display: block;
+    }
+
+    .digit-scanner-modal__market-card-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .digit-scanner-modal__strategy-row {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .digit-scanner-modal__strategy-row-value {
+        text-align: left;
+    }
+}
+
+@media (max-width: 600px) and (min-height: 0) {
+    .digit-scanner-modal,
+    .digit-scanner-confirm-modal {
+        .dc-dialog__dialog {
+            max-height: calc(100vh - 2rem);
+        }
+    }
+}
+
+@supports (height: 100dvh) {
+    @media (max-width: 600px) {
+        .digit-scanner-modal,
+        .digit-scanner-confirm-modal {
+            .dc-dialog__dialog {
+                max-height: calc(100dvh - 2rem);
+            }
+        }
+    }
+}
