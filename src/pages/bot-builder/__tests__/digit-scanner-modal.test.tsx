@@ -353,7 +353,7 @@ describe('DigitScannerModal', () => {
             prediction: { before: null, after: 5 },
         });
 
-        render(<DigitScannerModal {...defaultProps} is_running={true} />);
+        const { rerender } = render(<DigitScannerModal {...defaultProps} />);
 
         await act(async () => {
             fireEvent.click(screen.getByTestId('dialog-confirm'));
@@ -368,6 +368,8 @@ describe('DigitScannerModal', () => {
         await waitFor(() => {
             expect(screen.getByTestId('dt_digit_scanner_confirm_dialog')).toBeTruthy();
         });
+
+        rerender(<DigitScannerModal {...defaultProps} is_running={true} />);
 
         // Warning text must be visible
         expect(screen.getByTestId('dt_digit_scanner_bot_running_warning')).toBeTruthy();
