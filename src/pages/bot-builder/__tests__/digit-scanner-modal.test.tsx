@@ -127,7 +127,7 @@ describe('DigitScannerModal', () => {
 
     it('renders ranked results table after a successful scan', async () => {
         setupScanMocks();
-        render(<DigitScannerModal {...defaultProps} />);
+        const { container } = render(<DigitScannerModal {...defaultProps} />);
 
         await act(async () => {
             fireEvent.click(screen.getByTestId('dialog-confirm'));
@@ -138,11 +138,110 @@ describe('DigitScannerModal', () => {
         });
 
         expect(screen.getByTestId('dt_digit_scanner_ranked_row_R_100')).toBeTruthy();
-        expect(screen.getByText(/Heuristic score \(not a win probability\)/)).toBeTruthy();
+        expect(container.querySelector('.digit-scanner-modal__results-table')?.textContent).toContain(
+            'Heuristic score (not a win probability)'
+        );
         expect(screen.getByText(/Heuristics describe past noise only/)).toBeTruthy();
-        fireEvent.click(screen.getByLabelText('Expand strategies'));
+        fireEvent.click(screen.getAllByLabelText('Expand strategies')[0]);
         expect(screen.getByText('Matches 5')).toBeTruthy();
         expect(screen.getByText('digit 5 appears 12%')).toBeTruthy();
+    });
+
+    it('renders the same ranked markets in the desktop table and mobile cards', async () => {
+        const secondMarket = makeAnalysis({
+            symbol: 'R_200',
+            displayName: 'Volatility 200 Index',
+            recommendation: { direction: 'DIFFERS', digit: 3, agree: 3, disagree: 0, eligible: 3, heuristicScore: 60 },
+        });
+        setupScanMocks([makeAnalysis(), secondMarket]);
+        const { container } = render(<DigitScannerModal {...defaultProps} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('dt_digit_scanner_ranked_row_R_100')).toBeTruthy();
+            expect(screen.getByTestId('dt_digit_scanner_ranked_card_R_100')).toBeTruthy();
+        });
+
+        const table = container.querySelector('.digit-scanner-modal__results-table');
+        const cards = container.querySelector('.digit-scanner-modal__results-cards');
+        expect(table?.textContent).toContain('Volatility 100 Index');
+        expect(table?.textContent).toContain('Volatility 200 Index');
+        expect(cards?.textContent).toContain('Volatility 100 Index');
+        expect(cards?.textContent).toContain('Volatility 200 Index');
+        expect(cards?.textContent).toContain('Differs digit 3');
+        expect(container.querySelector('.digit-scanner-modal__content')).toBeTruthy();
+        expect(container.querySelector('.digit-scanner-confirm-modal__content')).toBeNull();
+    });
+
+    it('uses the mobile card Select button for the existing preview and apply flow', async () => {
+        setupScanMocks();
+        (previewScannerPick as jest.Mock).mockReturnValue({
+            ok: true,
+            symbol: { before: 'R_50', after: 'R_100' },
+            type: { before: 'DIGITMATCH', after: 'DIGITMATCH' },
+            prediction: { before: 3, after: 5 },
+        });
+        (applyScannerPick as jest.Mock).mockResolvedValue({ ok: true });
+
+        render(<DigitScannerModal {...defaultProps} />);
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+
+        const cardSelect = await screen.findByTestId('dt_digit_scanner_card_select_R_100');
+        fireEvent.click(cardSelect);
+
+        expect(await screen.findByTestId('dt_digit_scanner_confirm_dialog')).toBeTruthy();
+        expect(applyScannerPick).not.toHaveBeenCalled();
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+
+        await waitFor(() => {
+            expect(applyScannerPick).toHaveBeenCalledTimes(1);
+            expect(defaultProps.onApplied).toHaveBeenCalled();
+        });
+    });
+
+    it('disables the mobile card Select button while the bot is running', async () => {
+        setupScanMocks();
+        render(<DigitScannerModal {...defaultProps} is_running={true} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+
+        expect(await screen.findByTestId('dt_digit_scanner_card_select_R_100')).toBeDisabled();
+    });
+
+    it('uses scanner layout classes instead of fixed inline minimum widths', async () => {
+        setupScanMocks();
+        const { container } = render(<DigitScannerModal {...defaultProps} />);
+
+        const content = screen.getByTestId('dt_digit_scanner_modal_content');
+        expect(content.classList.contains('digit-scanner-modal__content')).toBe(true);
+        expect(content.style.minWidth).toBe('');
+        expect(container.querySelector('.digit-scanner-confirm-modal__content')).toBeNull();
+
+        (previewScannerPick as jest.Mock).mockReturnValue({
+            ok: true,
+            symbol: { before: 'R_50', after: 'R_100' },
+            type: { before: 'DIGITMATCH', after: 'DIGITMATCH' },
+            prediction: { before: 3, after: 5 },
+        });
+        setupScanMocks();
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+        fireEvent.click(await screen.findByTestId('dt_digit_scanner_card_select_R_100'));
+
+        const confirmContent = await screen.findByTestId('dt_digit_scanner_confirm_dialog');
+        expect(confirmContent.classList.contains('digit-scanner-confirm-modal__content')).toBe(true);
+        expect(confirmContent.style.minWidth).toBe('');
     });
 
     it('shows excluded markets with their status reasons', async () => {
@@ -353,7 +452,7 @@ describe('DigitScannerModal', () => {
             prediction: { before: null, after: 5 },
         });
 
-        render(<DigitScannerModal {...defaultProps} is_running={true} />);
+        const { rerender } = render(<DigitScannerModal {...defaultProps} is_running={false} />);
 
         await act(async () => {
             fireEvent.click(screen.getByTestId('dialog-confirm'));
@@ -370,6 +469,7 @@ describe('DigitScannerModal', () => {
         });
 
         // Warning text must be visible
+        rerender(<DigitScannerModal {...defaultProps} is_running={true} />);
         expect(screen.getByTestId('dt_digit_scanner_bot_running_warning')).toBeTruthy();
 
         // The Apply button is disabled while running.
