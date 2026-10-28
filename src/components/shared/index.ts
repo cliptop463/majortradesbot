@@ -31,3 +31,4 @@ export * from './utils/types';
 export * from './utils/url';
 export * from './utils/validation';
 export * from './utils/validator';
+export { getCodeVerifier, clearCodeVerifier } from '@/external/deriv-core';

@@ -20,7 +20,13 @@ const smartchartsDist = path.join(
 export default defineConfig({
   plugins: [
     pluginSass({
-      sassLoaderOptions: { sourceMap: true },
+      sassLoaderOptions: {
+        sourceMap: true,
+        sassOptions: {
+          loadPaths: [path.resolve(__dirname, 'src')],
+          includePaths: [path.resolve(__dirname, 'src')],
+        },
+      },
       exclude: /node_modules/,
     }),
     pluginReact(),
@@ -62,6 +68,13 @@ export default defineConfig({
       '@/utils': path.resolve(__dirname, './src/utils'),
       '@/constants': path.resolve(__dirname, './src/constants'),
       '@/stores': path.resolve(__dirname, './src/stores'),
+      '@/services': path.resolve(__dirname, './src/services'),
+      '@/pages': path.resolve(__dirname, './src/pages'),
+      '@/styles': path.resolve(__dirname, './src/styles'),
+      '@/types': path.resolve(__dirname, './src/types'),
+      '@/xml': path.resolve(__dirname, './src/xml'),
+      '@/translations': path.resolve(__dirname, './src/translations'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
   output: {

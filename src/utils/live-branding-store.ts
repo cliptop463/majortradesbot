@@ -1,70 +1,41 @@
-// Tiny reactive pub/sub stores for live App Builder branding (app name + logo +
-// name visibility). The PREVIEW_BRANDING message can arrive before the header
-// (and its logo+name mark) has mounted, so the values are stashed here and the
-// LogoMark component subscribes to them. The writer (the preview listener in
-// src/preview/) is stripped from standalone partner deploys, so these stores
-// stay inert there and LogoMark falls back to the build-time logo/name — that's
-// why they live here (always shipped) and not under src/preview/ (stripped by
-// the BFF).
-
-type NameListener = (name: string | null) => void;
-type LogoListener = (src: string | null) => void;
-type ShowNameListener = (show: boolean) => void;
-
+let previewLogo: string | null = null;
 let previewAppName: string | null = null;
-const appNameListeners = new Set<NameListener>();
-
-export function setPreviewAppName(name: string | null): void {
-    previewAppName = name;
-    appNameListeners.forEach((listener) => listener(name));
-}
-
-export function getPreviewAppName(): string | null {
-    return previewAppName;
-}
-
-export function subscribePreviewAppName(listener: NameListener): () => void {
-    appNameListeners.add(listener);
-    return () => {
-        appNameListeners.delete(listener);
-    };
-}
-
-let previewLogoSrc: string | null = null;
-const logoListeners = new Set<LogoListener>();
-
-export function setPreviewLogo(src: string | null): void {
-    previewLogoSrc = src;
-    logoListeners.forEach((listener) => listener(src));
-}
-
-export function getPreviewLogo(): string | null {
-    return previewLogoSrc;
-}
-
-export function subscribePreviewLogo(listener: LogoListener): () => void {
-    logoListeners.add(listener);
-    return () => {
-        logoListeners.delete(listener);
-    };
-}
-
-/** Defaults to true so a missing PREVIEW_BRANDING flag keeps today's behaviour. */
 let previewShowAppName = true;
-const showNameListeners = new Set<ShowNameListener>();
 
-export function setPreviewShowAppName(show: boolean): void {
-    previewShowAppName = show;
-    showNameListeners.forEach((listener) => listener(show));
-}
+const listenersLogo = new Set<(val: string | null) => void>();
+const listenersAppName = new Set<(val: string | null) => void>();
+const listenersShowAppName = new Set<(val: boolean) => void>();
 
-export function getPreviewShowAppName(): boolean {
-    return previewShowAppName;
-}
+export const getPreviewLogo = () => previewLogo;
+export const getPreviewAppName = () => previewAppName;
+export const getPreviewShowAppName = () => previewShowAppName;
 
-export function subscribePreviewShowAppName(listener: ShowNameListener): () => void {
-    showNameListeners.add(listener);
-    return () => {
-        showNameListeners.delete(listener);
-    };
-}
+export const setPreviewLogo = (val: string | null) => {
+    previewLogo = val;
+    listenersLogo.forEach(cb => cb(val));
+};
+
+export const setPreviewAppName = (val: string | null) => {
+    previewAppName = val;
+    listenersAppName.forEach(cb => cb(val));
+};
+
+export const setPreviewShowAppName = (val: boolean) => {
+    previewShowAppName = val;
+    listenersShowAppName.forEach(cb => cb(val));
+};
+
+export const subscribePreviewLogo = (cb: (val: string | null) => void) => {
+    listenersLogo.add(cb);
+    return () => listenersLogo.delete(cb);
+};
+
+export const subscribePreviewAppName = (cb: (val: string | null) => void) => {
+    listenersAppName.add(cb);
+    return () => listenersAppName.delete(cb);
+};
+
+export const subscribePreviewShowAppName = (cb: (val: boolean) => void) => {
+    listenersShowAppName.add(cb);
+    return () => listenersShowAppName.delete(cb);
+};
