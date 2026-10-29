@@ -13,8 +13,10 @@ import {
   type ScanReport,
   type MarketScanResult,
 } from '../services/digitScanner';
-import { scanMarkets, DEFAULT_MARKETS, type ScanReport, type MarketScanResult } from '../services/digitScanner';
-import { planXmlPatch, type PatchPlan } from '../services/botXmlPatch';
+import {
+  scanMarkets, DEFAULT_MARKETS, planXmlPatch,
+  type ScanReport, type MarketScanResult, type PatchPlan,
+} from '../services/digitScanner';
 
 export interface DigitScannerModalProps {
   open: boolean;
