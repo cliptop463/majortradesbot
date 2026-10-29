@@ -4,8 +4,7 @@
 // start_bot, never submits a trade, never auto-confirms.
 //
 
-import { scanMarkets, DEFAULT_MARKETS, type ScanReport, type MarketScanResult } from '../services/digitScanner';
-import { planXmlPatch, type PatchPlan } from '../services/botXmlPatch'; ============================================================
+ ============================================================
 
 import React, { useState } from 'react';
 import {
@@ -14,6 +13,7 @@ import {
   type ScanReport,
   type MarketScanResult,
 } from '../services/digitScanner';
+import { scanMarkets, DEFAULT_MARKETS, type ScanReport, type MarketScanResult } from '../services/digitScanner';
 import { planXmlPatch, type PatchPlan } from '../services/botXmlPatch';
 
 export interface DigitScannerModalProps {
