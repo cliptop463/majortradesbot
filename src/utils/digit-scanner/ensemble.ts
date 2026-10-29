@@ -144,8 +144,9 @@ export function analyzeDigits(
 
 /**
  * Deterministic market ranking:
- * score descending, agreement count descending, observation count descending,
- * then symbol ascending (case-sensitive lexical order). No direction is privileged.
+ * 1) heuristic score descending, 2) agreeing-strategy count descending,
+ * 3) eligible-strategy count descending, 4) market symbol ascending
+ * (case-sensitive lexical order). No direction is privileged.
  * Failed, insufficient, or non-consensus markets are excluded, never scored as zero.
  */
 export function rankMarkets(analyses: MarketAnalysis[]): RankingResult {
@@ -164,7 +165,7 @@ export function rankMarkets(analyses: MarketAnalysis[]): RankingResult {
     const sorted = [...eligible].sort((a, b) =>
         b.recommendation.heuristicScore - a.recommendation.heuristicScore ||
         b.recommendation.agree - a.recommendation.agree ||
-        b.observations - a.observations ||
+        b.recommendation.eligible - a.recommendation.eligible ||
         (a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0)
     );
 

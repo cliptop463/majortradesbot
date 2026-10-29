@@ -14,10 +14,14 @@ export type ActiveSymbol = ActiveSymbols[number] & {
 
 export type Direction = 'MATCHES' | 'DIFFERS';
 
+export type StrategySignal = Direction | 'ABSTAIN';
+
 export interface StrategyResult {
     id: string;
     name: string;
     status: 'signal' | 'abstain' | 'ineligible';
+    /** Independent per-strategy vote: MATCHES / DIFFERS, or ABSTAIN when preconditions are not met. */
+    signal: StrategySignal;
     direction?: Direction;
     digit?: number;
     strength?: number;

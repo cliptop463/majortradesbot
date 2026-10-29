@@ -92,7 +92,7 @@ const invalidDigitSequence = (digits: readonly number[]) =>
     digits.some(d => !Number.isInteger(d) || d < 0 || d > 9);
 
 const noSignal = (id: string, name: string, reason: string, status: 'abstain' | 'ineligible' = 'abstain'): StrategyResult =>
-    ({ id, name, status, reason });
+    ({ id, name, status, signal: 'ABSTAIN', reason });
 
 const countsOf = (digits: readonly number[]) => {
     const counts = new Array(10).fill(0);
@@ -112,7 +112,7 @@ export function frequencyStrategy(digits: readonly number[]): StrategyResult {
     const d = decideFromZ(counts, digits.length);
     if (!d) return noSignal(id, name, `No digit crossed the conservative z threshold in ${digits.length} ticks.`);
     return {
-        id, name, status: 'signal', direction: d.direction, digit: d.digit, strength: d.strength,
+        id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
         reason: zReason(d, `Digit ${d.digit} occurred ${counts[d.digit]}/${digits.length} times`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
     };
 }
@@ -132,7 +132,7 @@ export function recencyStrategy(digits: readonly number[]): StrategyResult {
     const d = decideFromZ(effectiveCounts, nEff);
     if (!d) return noSignal(id, name, `Recency-weighted digit shares did not cross threshold (effective N=${nEff.toFixed(1)}).`);
     return {
-        id, name, status: 'signal', direction: d.direction, digit: d.digit, strength: d.strength,
+        id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
         reason: zReason(d, `Digit ${d.digit} has ${(100 * weights[d.digit] / sumW).toFixed(1)}% of exponentially weighted share (half-life 50 ticks)`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
     };
 }
@@ -146,7 +146,7 @@ export function streakStrategy(digits: readonly number[]): StrategyResult {
     for (let i = digits.length - 2; i >= 0 && digits[i] === target; i--) run++;
     if (run < THRESHOLDS.streakMin) return noSignal(id, name, `Current run is ${run}; threshold is ${THRESHOLDS.streakMin}.`);
     return {
-        id, name, status: 'signal', direction: 'MATCHES', digit: target,
+        id, name, status: 'signal', signal: 'MATCHES', direction: 'MATCHES', digit: target,
         strength: Math.min(1, run / 8),
         reason: `Digit ${target} repeated ${run} consecutive ticks. Run length is descriptive and does not imply continuation.`,
     };
@@ -167,7 +167,7 @@ export function momentumStrategy(digits: readonly number[]): StrategyResult {
     const d = decideFromZ(zs, { zMatch: THRESHOLDS.zMatch, zDiff: THRESHOLDS.momentumZDiff });
     if (!d) return noSignal(id, name, 'No digit share shift crossed the conservative two-window threshold.');
     return {
-        id, name, status: 'signal', direction: d.direction, digit: d.digit, strength: d.strength,
+        id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
         reason: zReason(d, `Digit ${d.digit}: ${(100 * recentC[d.digit] / 50).toFixed(1)}% in last 50 ticks vs ${(100 * priorC[d.digit] / 100).toFixed(1)}% in prior 100`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.momentumZDiff)),
     };
 }
@@ -187,7 +187,7 @@ export function skewStrategy(digits: readonly number[]): StrategyResult {
     const high = counts[hot] - expected >= expected - counts[cold];
     const digit = high ? hot : cold;
     return {
-        id, name, status: 'signal', direction: high ? 'MATCHES' : 'DIFFERS', digit,
+        id, name, status: 'signal', signal: high ? 'MATCHES' : 'DIFFERS', direction: high ? 'MATCHES' : 'DIFFERS', digit,
         strength: Math.min(1, chi / (THRESHOLDS.skewChiSquare * 2)),
         reason: `Chi-square=${chi.toFixed(2)} (df=9); digit ${digit} occurred ${counts[digit]} times vs ${expected.toFixed(1)} expected. Describes this sample only.`,
     };
@@ -203,7 +203,7 @@ export function transitionsStrategy(digits: readonly number[]): StrategyResult {
     const counts = countsOf(successors), d = decideFromZ(counts, successors.length);
     if (!d) return noSignal(id, name, `Successor distribution after digit ${current} did not cross threshold.`);
     return {
-        id, name, status: 'signal', direction: d.direction, digit: d.digit, strength: d.strength,
+        id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
         reason: zReason(d, `Digit ${d.digit} followed current digit ${current} ${counts[d.digit]}/${successors.length} times`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
     };
 }
@@ -237,7 +237,7 @@ export function cyclesStrategy(digits: readonly number[]): StrategyResult {
     if (bestZ < THRESHOLDS.cycleZMin) return noSignal(id, name, `Best tested period=${bestPeriod}, z=${bestZ.toFixed(2)}; below ${THRESHOLDS.cycleZMin}.`);
     const digit = digits[digits.length - bestPeriod];
     return {
-        id, name, status: 'signal', direction: 'MATCHES', digit,
+        id, name, status: 'signal', signal: 'MATCHES', direction: 'MATCHES', digit,
         strength: Math.min(1, bestZ / 6),
         reason: `Period ${bestPeriod}: ${bestMatches}/${bestN} lagged digit matches, z=${bestZ.toFixed(2)}. Selected after searching 11 periods; multiple-testing risk remains.`,
     };
