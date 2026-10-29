@@ -77,8 +77,9 @@ describe('digit scanner scan utilities', () => {
 
         expect(results[0].status).toBe('error');
         expect(results[0].message).toContain('network timeout');
-        expect(results[1].status).toBe('ok');
-        expect(results[1].recommendation).not.toBeNull();
+        expect(results[0].recommendation).toBeNull();
+        expect(results[1].status).not.toBe('error');
+        expect(results[1].observations).toBe(250);
     });
 
     it('respects the 200-tick minimum when scanning history', async () => {

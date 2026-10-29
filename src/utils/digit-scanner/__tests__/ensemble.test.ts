@@ -8,18 +8,18 @@ const signal = (
     digit: number,
     strength = 0.5
 ): (() => StrategyResult) => () => ({
-    id, name: id, status: 'signal', direction, digit, strength, reason: `${id} reason`,
+    id, name: id, status: 'signal', signal: direction, direction, digit, strength, reason: `${id} reason`,
 });
 
 const abstain = (id: string): (() => StrategyResult) => () => ({
-    id, name: id, status: 'abstain', reason: 'No threshold crossed',
+    id, name: id, status: 'abstain', signal: 'ABSTAIN', reason: 'No threshold crossed',
 });
 
 const analysis = (
     symbol: string,
     score: number,
     agree: number,
-    observations = 300,
+    eligible = 5,
     direction: 'MATCHES' | 'DIFFERS' = 'MATCHES'
 ): MarketAnalysis => ({
     symbol,
@@ -27,12 +27,12 @@ const analysis = (
     market: 'synthetic_index',
     submarket: 'random_index',
     pipSize: 2,
-    observations,
+    observations: 300,
     dropped: 0,
     status: 'ok',
     strategies: [],
     recommendation: {
-        direction, digit: 5, agree, disagree: 0, eligible: 5, heuristicScore: score,
+        direction, digit: 5, agree, disagree: 0, eligible, heuristicScore: score,
     },
 });
 
@@ -75,7 +75,7 @@ describe('analyzeDigits consensus', () => {
 
     it('ignores malformed signals and rejects invalid digit input', () => {
         const malformed = (): StrategyResult => ({
-            id: 'bad', name: 'Bad', status: 'signal', direction: 'MATCHES', digit: 12, strength: 0.8, reason: 'bad',
+            id: 'bad', name: 'Bad', status: 'signal', signal: 'MATCHES', direction: 'MATCHES', digit: 12, strength: 0.8, reason: 'bad',
         });
         const result = analyzeDigits([1, 2, 3], { strategies: [malformed] });
         expect(result.recommendation).toBeNull();
@@ -98,14 +98,21 @@ describe('analyzeDigits consensus', () => {
 });
 
 describe('rankMarkets', () => {
-    it('ranks by score, agreement, observations, then symbol without direction bias', () => {
-        const lowerScoreMatches = analysis('R_10', 55, 4, 500, 'MATCHES');
-        const higherScoreDiffers = analysis('R_25', 80, 2, 250, 'DIFFERS');
-        const tiedA = analysis('R_50', 80, 3, 300, 'MATCHES');
-        const tiedB = analysis('R_100', 80, 3, 300, 'DIFFERS');
+    it('ranks by score, agreement, eligible-strategy count, then symbol without direction bias', () => {
+        const lowerScoreMatches = analysis('R_10', 55, 4, 8, 'MATCHES');
+        const higherScoreDiffers = analysis('R_25', 80, 2, 5, 'DIFFERS');
+        const tiedA = analysis('R_50', 80, 3, 5, 'MATCHES');
+        const tiedB = analysis('R_100', 80, 3, 5, 'DIFFERS');
         const result = rankMarkets([lowerScoreMatches, higherScoreDiffers, tiedA, tiedB]);
         expect(result.ranked.map(x => x.analysis.symbol)).toEqual(['R_100', 'R_50', 'R_25', 'R_10']);
         expect(result.selected?.analysis.symbol).toBe('R_100');
+    });
+
+    it('breaks score and agreement ties by more eligible strategies before symbol', () => {
+        const fewer = analysis('R_10', 80, 3, 5);
+        const more = analysis('R_75', 80, 3, 8);
+        const result = rankMarkets([fewer, more]);
+        expect(result.ranked.map(x => x.analysis.symbol)).toEqual(['R_75', 'R_10']);
     });
 
     it('is input-order independent and excludes failed/insufficient/no-consensus analyses', () => {
