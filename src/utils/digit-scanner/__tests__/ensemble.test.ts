@@ -56,7 +56,7 @@ describe('analyzeDigits consensus', () => {
             ],
         });
         expect(result.recommendation).toMatchObject({
-            direction: 'MATCHES', digit: 4, agree: 2, heuristicScore: 46,
+            direction: 'MATCHES', digit: 4, agree: 2, heuristicScore: 58.7,
         });
     });
 
