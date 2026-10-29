@@ -14,6 +14,11 @@ export type ScannerPickFieldPreview = {
 export type ScannerPickPreview = {
     ok: true;
     symbol: ScannerPickFieldPreview;
+    /** Trade type category field (TRADETYPECAT_LIST), set to 'digits'. */
+    category: ScannerPickFieldPreview;
+    /** Trade type field (TRADETYPE_LIST), set to 'matchesdiffers'. */
+    tradeType: ScannerPickFieldPreview;
+    /** Matches/Differs contract type field (TYPE_LIST): DIGITMATCH or DIGITDIFF. */
     type: ScannerPickFieldPreview;
     prediction: ScannerPickFieldPreview;
 };
@@ -21,6 +26,8 @@ export type ScannerPickPreview = {
 export type ScannerPickFailure = {
     ok: false;
     reason: string;
+    /** True when a required block or field is missing: the patch is BLOCKED and nothing is written. */
+    blocked?: boolean;
 };
 
 export type ScannerPickResult = ScannerPickPreview | ScannerPickFailure;
@@ -248,19 +255,43 @@ export const ensureMatchesDiffers = async (tradeTypeBlock: any): Promise<Scanner
     return { ok: true };
 };
 
+const blocked = (reason: string): ScannerPickFailure => ({ ok: false, blocked: true, reason: `BLOCKED: ${reason}` });
+
+/** Returns the name of the first required field missing from its block, or null when all are present. */
+const findMissingField = (marketBlock: any, tradeTypeBlock: any): string | null => {
+    const checks: Array<[any, string]> = [
+        [marketBlock, FIELD_NAMES.symbol],
+        [tradeTypeBlock, FIELD_NAMES.tradeTypeCategory],
+        [tradeTypeBlock, FIELD_NAMES.tradeType],
+    ];
+    for (const [block, fieldName] of checks) {
+        if (typeof block?.getField === 'function' && !block.getField(fieldName)) {
+            return fieldName;
+        }
+    }
+    return null;
+};
+
 export const previewScannerPick = (workspace: any, pick: ScannerPickInput): ScannerPickResult => {
     try {
         const validatedDigit = normalizeDigit(pick.digit);
         const required = findRequiredBlocks(workspace);
         if (!required.ok) {
-            return { ok: false, reason: required.reason };
+            return blocked(required.reason);
         }
 
-        const { marketBlock, contractTypeBlock, predictionBlock } = required;
+        const { marketBlock, contractTypeBlock, predictionBlock, tradeTypeBlock } = required;
+
+        const missingField = findMissingField(marketBlock, tradeTypeBlock);
+        if (missingField) {
+            return blocked(`Required field ${missingField} was not found on its block.`);
+        }
 
         const symbolBefore = getFieldValue(marketBlock, FIELD_NAMES.symbol);
         const typeBefore = getContractTypeValue(contractTypeBlock);
         const predictionBefore = getPredictionValue(predictionBlock);
+        const categoryBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory);
+        const tradeTypeBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType);
 
         const targetType = pick.direction === 'MATCHES' ? 'DIGITMATCH' : 'DIGITDIFF';
         const symbolAfter = pick.symbol;
@@ -270,6 +301,8 @@ export const previewScannerPick = (workspace: any, pick: ScannerPickInput): Scan
         return {
             ok: true,
             symbol: { before: symbolBefore, after: symbolAfter },
+            category: { before: categoryBefore, after: 'digits' },
+            tradeType: { before: tradeTypeBefore, after: 'matchesdiffers' },
             type: { before: typeBefore, after: typeAfter },
             prediction: { before: predictionBefore, after: predictionAfter },
         };
@@ -294,7 +327,7 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
 
         const required = findRequiredBlocks(workspace);
         if (!required.ok) {
-            return { ok: false, reason: required.reason };
+            return blocked(required.reason);
         }
 
         const { marketBlock, contractTypeBlock, predictionBlock, tradeTypeBlock } = required;
@@ -352,6 +385,8 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
             return {
                 ok: true,
                 symbol: { before: symbolBefore, after: targetSymbol },
+                category: preview.category,
+                tradeType: preview.tradeType,
                 type: { before: typeBefore, after: targetType },
                 prediction: { before: predictionBefore, after: targetDigit },
             };
@@ -381,85 +416,3 @@ export default {
     applyScannerPick,
     ensureMatchesDiffers,
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
