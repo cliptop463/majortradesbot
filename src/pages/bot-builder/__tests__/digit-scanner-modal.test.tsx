@@ -119,6 +119,34 @@ describe('DigitScannerModal', () => {
         (ApiHelpers.instance.active_symbols as any).has_initialization_error = false;
     });
 
+    it('passes the configured minimum ticks to the scanner and defaults to 200', async () => {
+        setupScanMocks();
+        render(<DigitScannerModal {...defaultProps} />);
+        const input = screen.getByTestId('dt_digit_scanner_min_ticks') as HTMLInputElement;
+        expect(input.value).toBe('200');
+
+        fireEvent.change(input, { target: { value: '300' } });
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+
+        await waitFor(() => expect(scanMarkets).toHaveBeenCalled());
+        const options = (scanMarkets as jest.Mock).mock.calls[0][2];
+        expect(options.minObservations).toBe(300);
+        expect(options.count).toBeGreaterThanOrEqual(300);
+    });
+
+    it('rejects an invalid minimum tick value without scanning', async () => {
+        setupScanMocks();
+        render(<DigitScannerModal {...defaultProps} />);
+        fireEvent.change(screen.getByTestId('dt_digit_scanner_min_ticks'), { target: { value: '10' } });
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+        expect(await screen.findByTestId('dt_digit_scanner_error')).toBeTruthy();
+        expect(scanMarkets).not.toHaveBeenCalled();
+    });
+
     it('renders idle state with Scan button when first opened', () => {
         render(<DigitScannerModal {...defaultProps} />);
         expect(screen.getByTestId('dt_digit_scanner_modal_content')).toBeTruthy();
