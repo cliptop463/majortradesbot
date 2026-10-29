@@ -2,7 +2,10 @@
 // Digit Scanner Modal — complete, self-contained.
 // Props are the only external wiring needed. Never calls
 // start_bot, never submits a trade, never auto-confirms.
-// ============================================================
+//
+
+import { scanMarkets, DEFAULT_MARKETS, type ScanReport, type MarketScanResult } from '../services/digitScanner';
+import { planXmlPatch, type PatchPlan } from '../services/botXmlPatch'; ============================================================
 
 import React, { useState } from 'react';
 import {
