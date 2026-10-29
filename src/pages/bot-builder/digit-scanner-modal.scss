@@ -348,3 +348,248 @@
         }
     }
 }
+
+/* ── Classes that replace former inline styles ───────────────────────────── */
+
+@keyframes digit-scanner-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.digit-scanner-spinner {
+    display: inline-block;
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 2px solid var(--button-primary-default);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: digit-scanner-spin 0.8s linear infinite;
+}
+
+.digit-scanner-modal__settings {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.4rem 0.8rem 0.8rem;
+}
+
+.digit-scanner-modal__settings-label {
+    flex: 1;
+    font-size: 1.2rem;
+    color: var(--text-prominent);
+}
+
+.digit-scanner-modal__settings-input {
+    width: 9rem;
+    min-height: 3.6rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--border-normal);
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--text-prominent);
+    font-size: 1.2rem;
+
+    &--invalid {
+        border-color: var(--status-danger);
+    }
+}
+
+.digit-scanner-modal__scanning {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 1.6rem;
+    color: var(--text-prominent);
+}
+
+.digit-scanner-modal__message {
+    padding: 0.8rem;
+    color: var(--text-less-prominent);
+
+    &--error {
+        color: var(--status-danger);
+    }
+}
+
+.digit-scanner-modal__selected {
+    padding: 0.4rem 0.8rem 0.8rem;
+    font-weight: 600;
+    color: var(--text-prominent);
+}
+
+.digit-scanner-modal__disclaimer {
+    padding: 0.4rem 0.8rem;
+    font-size: 1.1rem;
+    font-style: italic;
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__results-head {
+    border-bottom: 1px solid var(--border-normal);
+    text-align: left;
+    font-size: 1.1rem;
+    color: var(--text-less-prominent);
+
+    th {
+        padding: 0.4rem 0.8rem;
+    }
+}
+
+.digit-scanner-modal__ranked-row {
+    cursor: pointer;
+
+    &--disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+}
+
+.digit-scanner-modal__cell {
+    padding: 0.6rem 0.8rem;
+
+    &--market {
+        font-weight: 600;
+    }
+
+    &--compact {
+        padding: 0.5rem 0.8rem;
+    }
+}
+
+.digit-scanner-modal__row-toggle {
+    margin-right: 0.4rem;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text-prominent);
+}
+
+.digit-scanner-modal__row-symbol {
+    display: block;
+    font-size: 1rem;
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__info-icon {
+    margin-left: 0.3rem;
+    font-size: 1rem;
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__row-select {
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--button-primary-default);
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--button-primary-default);
+    cursor: pointer;
+    font-size: 1.1rem;
+
+    &:disabled {
+        cursor: not-allowed;
+    }
+}
+
+.digit-scanner-modal__expanded-cell {
+    padding: 0 1.6rem 0.8rem;
+}
+
+.digit-scanner-modal__strategy-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.digit-scanner-modal__strategy-table-head {
+    font-size: 1rem;
+    text-align: left;
+    color: var(--text-less-prominent);
+
+    th {
+        padding: 0.2rem 0.8rem;
+    }
+}
+
+.digit-scanner-modal__strategy-table-row td {
+    padding: 0.3rem 0.8rem;
+    vertical-align: top;
+}
+
+.digit-scanner-modal__strategy-table-reason {
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__excluded-title {
+    margin-top: 1.2rem;
+    padding: 0.8rem;
+    font-size: 1.1rem;
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__excluded-row,
+.digit-scanner-modal__excluded-detail {
+    background: var(--general-section-1);
+}
+
+.digit-scanner-modal__excluded-row {
+    opacity: 0.7;
+}
+
+.digit-scanner-modal__excluded-reason {
+    margin-left: 0.6rem;
+    font-size: 1.1rem;
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__badge {
+    display: inline-block;
+    padding: 0.1rem 0.6rem;
+    border-radius: 0.8rem;
+    border: 1px solid var(--border-normal);
+    font-size: 1rem;
+    color: var(--text-less-prominent);
+
+    &--ok {
+        border-color: var(--status-success, currentColor);
+    }
+
+    &--error {
+        border-color: var(--status-danger);
+        color: var(--status-danger);
+    }
+
+    &--insufficient_data,
+    &--no_consensus {
+        border-color: var(--status-warning, currentColor);
+    }
+}
+
+.digit-scanner-confirm-modal__summary {
+    margin-bottom: 0.8rem;
+    font-weight: 600;
+    color: var(--text-prominent);
+}
+
+.digit-scanner-confirm-modal__head {
+    font-size: 1.1rem;
+    text-align: left;
+    color: var(--text-less-prominent);
+
+    th {
+        padding: 0.4rem 0.8rem;
+    }
+}
+
+.digit-scanner-confirm-modal__table td {
+    padding: 0.5rem 0.8rem;
+}
+
+.digit-scanner-confirm-modal__before {
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-confirm-modal__after {
+    font-weight: 600;
+}

@@ -23,18 +23,17 @@ type ScanStatus = 'idle' | 'scanning' | 'done' | 'error';
 type ConfirmState = {
     pick: { symbol: string; direction: 'MATCHES' | 'DIFFERS'; digit: number };
     preview: ScannerPickPreview;
+    displayName?: string;
 } | null;
 
 const directionLabel = (d: string) => (d === 'MATCHES' ? 'Matches' : 'Differs');
 
+const DEFAULT_MIN_TICKS = 200;
+const MIN_TICKS_FLOOR = 50;
+const MAX_TICKS = 5000;
+const DEFAULT_FETCH_COUNT = 500;
+
 const StatusBadge: React.FC<{ status: MarketAnalysis['status'] | 'skipped' }> = ({ status }) => {
-    const colours: Record<string, string> = {
-        ok: '#4caf50',
-        no_consensus: '#ff9800',
-        insufficient_data: '#9e9e9e',
-        error: '#f44336',
-        skipped: '#9e9e9e',
-    };
     const labels: Record<string, string> = {
         ok: 'OK',
         no_consensus: 'No consensus',
@@ -43,31 +42,21 @@ const StatusBadge: React.FC<{ status: MarketAnalysis['status'] | 'skipped' }> = 
         skipped: 'Skipped',
     };
     return (
-        <span
-            style={{
-                display: 'inline-block',
-                padding: '0.15rem 0.5rem',
-                borderRadius: '0.3rem',
-                backgroundColor: colours[status] ?? '#9e9e9e',
-                color: '#fff',
-                fontSize: '1.1rem',
-                fontWeight: 600,
-            }}
-        >
+        <span className={`digit-scanner-modal__badge digit-scanner-modal__badge--${status}`}>
             {labels[status] ?? status}
         </span>
     );
 };
 
 const StrategyRow: React.FC<{ s: StrategyResult }> = ({ s }) => (
-    <tr style={{ fontSize: '1.1rem', color: 'var(--text-less-prominent)' }}>
-        <td style={{ padding: '0.2rem 0.8rem' }}>{s.name}</td>
-        <td style={{ padding: '0.2rem 0.8rem' }}>
+    <tr className='digit-scanner-modal__strategy-table-row'>
+        <td>{s.name}</td>
+        <td>
             {s.status === 'signal' && s.direction !== undefined && s.digit !== undefined
                 ? `${directionLabel(s.direction)} ${s.digit}`
                 : s.status}
         </td>
-        <td style={{ padding: '0.2rem 0.8rem', fontStyle: 'italic' }}>{s.reason}</td>
+        <td className='digit-scanner-modal__strategy-table-reason'>{s.reason}</td>
     </tr>
 );
 
@@ -83,70 +72,44 @@ const RankedRow: React.FC<{
         <>
             <tr
                 data-testid={`dt_digit_scanner_ranked_row_${analysis.symbol}`}
-                style={{ cursor: isRunning ? 'not-allowed' : 'pointer', opacity: isRunning ? 0.6 : 1 }}
+                className={`digit-scanner-modal__ranked-row${isRunning ? ' digit-scanner-modal__ranked-row--disabled' : ''}`}
                 onClick={() => !isRunning && onSelect(analysis)}
             >
-                <td style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>
+                <td className='digit-scanner-modal__cell digit-scanner-modal__cell--market'>
                     <button
+                        type='button'
+                        className='digit-scanner-modal__row-toggle'
                         aria-label={expanded ? localize('Collapse strategies') : localize('Expand strategies')}
                         onClick={e => {
                             e.stopPropagation();
                             setExpanded(x => !x);
                         }}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            marginRight: '0.4rem',
-                            fontSize: '1rem',
-                            color: 'var(--text-prominent)',
-                        }}
                     >
                         {expanded ? '▼' : '▶'}
                     </button>
                     #{ranked.rank} {analysis.displayName}
-                    <span
-                        style={{
-                            display: 'block',
-                            fontSize: '1rem',
-                            color: 'var(--text-less-prominent)',
-                        }}
-                    >
-                        {analysis.symbol}
-                    </span>
+                    <span className='digit-scanner-modal__row-symbol'>{analysis.symbol}</span>
                 </td>
-                <td style={{ padding: '0.6rem 0.8rem' }}>
+                <td className='digit-scanner-modal__cell'>
                     <strong>{directionLabel(recommendation.direction)}</strong> digit{' '}
                     <strong>{recommendation.digit}</strong>
                 </td>
-                <td style={{ padding: '0.6rem 0.8rem' }}>
+                <td className='digit-scanner-modal__cell'>
                     {recommendation.agree}/{recommendation.eligible} agree
                 </td>
-                <td
-                    title={localize('Heuristic score — not a win probability')}
-                    style={{ padding: '0.6rem 0.8rem' }}
-                >
+                <td className='digit-scanner-modal__cell' title={localize('Heuristic score — not a win probability')}>
                     {recommendation.heuristicScore.toFixed(1)}
-                    <span style={{ fontSize: '1rem', marginLeft: '0.3rem', color: 'var(--text-less-prominent)' }}>
-                        ℹ️
-                    </span>
+                    <span className='digit-scanner-modal__info-icon'>ℹ️</span>
                 </td>
-                <td style={{ padding: '0.6rem 0.8rem' }}>
+                <td className='digit-scanner-modal__cell'>
                     <button
+                        type='button'
+                        className='digit-scanner-modal__row-select'
                         data-testid={`dt_digit_scanner_select_row_${analysis.symbol}`}
                         disabled={isRunning}
                         onClick={e => {
                             e.stopPropagation();
                             if (!isRunning) onSelect(analysis);
-                        }}
-                        style={{
-                            padding: '0.3rem 0.8rem',
-                            borderRadius: '0.4rem',
-                            border: '1px solid var(--button-primary-default)',
-                            background: 'transparent',
-                            color: 'var(--button-primary-default)',
-                            cursor: isRunning ? 'not-allowed' : 'pointer',
-                            fontSize: '1.1rem',
                         }}
                     >
                         {localize('Select')}
@@ -155,19 +118,13 @@ const RankedRow: React.FC<{
             </tr>
             {expanded && (
                 <tr>
-                    <td colSpan={5} style={{ padding: '0 1.6rem 0.8rem' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <td colSpan={5} className='digit-scanner-modal__expanded-cell'>
+                        <table className='digit-scanner-modal__strategy-table'>
                             <thead>
-                                <tr
-                                    style={{
-                                        fontSize: '1rem',
-                                        color: 'var(--text-less-prominent)',
-                                        textAlign: 'left',
-                                    }}
-                                >
-                                    <th style={{ padding: '0.2rem 0.8rem' }}>{localize('Strategy')}</th>
-                                    <th style={{ padding: '0.2rem 0.8rem' }}>{localize('Signal')}</th>
-                                    <th style={{ padding: '0.2rem 0.8rem' }}>{localize('Reason')}</th>
+                                <tr className='digit-scanner-modal__strategy-table-head'>
+                                    <th>{localize('Strategy')}</th>
+                                    <th>{localize('Signal')}</th>
+                                    <th>{localize('Reason')}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -278,39 +235,30 @@ const ExcludedRow: React.FC<{ analysis: MarketAnalysis }> = ({ analysis }) => {
     const [expanded, setExpanded] = React.useState(false);
     return (
         <>
-            <tr style={{ background: 'var(--general-section-1)', opacity: 0.7 }}>
-                <td style={{ padding: '0.5rem 0.8rem' }}>
+            <tr className='digit-scanner-modal__excluded-row'>
+                <td className='digit-scanner-modal__cell digit-scanner-modal__cell--compact'>
                     {analysis.strategies.length > 0 && (
                         <button
+                            type='button'
+                            className='digit-scanner-modal__row-toggle'
                             aria-label={expanded ? localize('Collapse') : localize('Expand')}
                             onClick={() => setExpanded(x => !x)}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: 'pointer',
-                                marginRight: '0.4rem',
-                                fontSize: '1rem',
-                            }}
                         >
                             {expanded ? '▼' : '▶'}
                         </button>
                     )}
                     {analysis.displayName}
                 </td>
-                <td style={{ padding: '0.5rem 0.8rem' }} colSpan={2}>
+                <td className='digit-scanner-modal__cell digit-scanner-modal__cell--compact' colSpan={2}>
                     <StatusBadge status={analysis.status} />
-                    {analysis.message && (
-                        <span style={{ marginLeft: '0.6rem', fontSize: '1.1rem', color: 'var(--text-less-prominent)' }}>
-                            {analysis.message}
-                        </span>
-                    )}
+                    {analysis.message && <span className='digit-scanner-modal__excluded-reason'>{analysis.message}</span>}
                 </td>
                 <td colSpan={2} />
             </tr>
             {expanded && analysis.strategies.length > 0 && (
-                <tr style={{ background: 'var(--general-section-1)' }}>
-                    <td colSpan={5} style={{ padding: '0 1.6rem 0.8rem' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tr className='digit-scanner-modal__excluded-detail'>
+                    <td colSpan={5} className='digit-scanner-modal__expanded-cell'>
+                        <table className='digit-scanner-modal__strategy-table'>
                             <tbody>
                                 {analysis.strategies.map(s => (
                                     <StrategyRow key={s.id} s={s} />
@@ -325,18 +273,14 @@ const ExcludedRow: React.FC<{ analysis: MarketAnalysis }> = ({ analysis }) => {
 };
 
 const SkippedRow: React.FC<{ market: SkippedMarket }> = ({ market }) => (
-    <tr style={{ background: 'var(--general-section-1)', opacity: 0.7 }}>
-        <td style={{ padding: '0.5rem 0.8rem' }}>
+    <tr className='digit-scanner-modal__excluded-row'>
+        <td className='digit-scanner-modal__cell digit-scanner-modal__cell--compact'>
             {market.displayName}
-            <span style={{ display: 'block', fontSize: '1rem', color: 'var(--text-less-prominent)' }}>
-                {market.symbol}
-            </span>
+            <span className='digit-scanner-modal__row-symbol'>{market.symbol}</span>
         </td>
-        <td style={{ padding: '0.5rem 0.8rem' }} colSpan={2}>
+        <td className='digit-scanner-modal__cell digit-scanner-modal__cell--compact' colSpan={2}>
             <StatusBadge status='skipped' />
-            <span style={{ marginLeft: '0.6rem', fontSize: '1.1rem', color: 'var(--text-less-prominent)' }}>
-                {market.reason}
-            </span>
+            <span className='digit-scanner-modal__excluded-reason'>{market.reason}</span>
         </td>
         <td colSpan={2} />
     </tr>
@@ -350,9 +294,24 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
     const [confirm_state, setConfirmState] = React.useState<ConfirmState>(null);
     const [apply_error, setApplyError] = React.useState('');
     const [is_applying, setIsApplying] = React.useState(false);
+    const [min_ticks_input, setMinTicksInput] = React.useState(String(DEFAULT_MIN_TICKS));
+
+    const parsed_min_ticks = Number.parseInt(min_ticks_input, 10);
+    const is_min_ticks_valid =
+        Number.isInteger(parsed_min_ticks) && parsed_min_ticks >= MIN_TICKS_FLOOR && parsed_min_ticks <= MAX_TICKS;
 
     const handleScan = async () => {
         if (scan_status === 'scanning') return;
+        if (!is_min_ticks_valid) {
+            setErrorMsg(
+                localize('Minimum ticks must be a whole number between {{min}} and {{max}}.', {
+                    min: MIN_TICKS_FLOOR,
+                    max: MAX_TICKS,
+                })
+            );
+            setScanStatus('error');
+            return;
+        }
         setScanStatus('scanning');
         setErrorMsg('');
         setRanking(null);
@@ -386,8 +345,8 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
             }
 
             const analyses = await scanMarkets(markets, fetchHistory, {
-                count: 500,
-                minObservations: 200,
+                count: Math.min(MAX_TICKS, Math.max(DEFAULT_FETCH_COUNT, parsed_min_ticks)),
+                minObservations: parsed_min_ticks,
                 concurrency: 3,
                 timeout: 10000,
             });
@@ -407,6 +366,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
             direction: analysis.recommendation.direction,
             digit: analysis.recommendation.digit,
         };
+        const display_name = analysis.displayName;
         const workspace = window?.Blockly?.derivWorkspace;
         const preview = previewScannerPick(workspace, pick);
         if (!preview.ok) {
@@ -414,7 +374,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
             return;
         }
         setApplyError('');
-        setConfirmState({ pick, preview });
+        setConfirmState({ pick, preview, displayName: display_name });
     };
 
     const handleApply = async () => {
@@ -470,55 +430,52 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                     className='digit-scanner-modal__content'
                     data-testid='dt_digit_scanner_modal_content'
                 >
+                    <div className='digit-scanner-modal__settings'>
+                        <label className='digit-scanner-modal__settings-label' htmlFor='digit-scanner-min-ticks'>
+                            {localize('Minimum ticks per market')}
+                        </label>
+                        <input
+                            id='digit-scanner-min-ticks'
+                            data-testid='dt_digit_scanner_min_ticks'
+                            className={`digit-scanner-modal__settings-input${
+                                is_min_ticks_valid ? '' : ' digit-scanner-modal__settings-input--invalid'
+                            }`}
+                            type='number'
+                            inputMode='numeric'
+                            min={MIN_TICKS_FLOOR}
+                            max={MAX_TICKS}
+                            step={50}
+                            value={min_ticks_input}
+                            disabled={scan_status === 'scanning'}
+                            onChange={e => setMinTicksInput(e.target.value)}
+                        />
+                    </div>
+
                     {scan_status === 'scanning' && (
-                        <div
-                            data-testid='dt_digit_scanner_scanning'
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.8rem',
-                                padding: '1.6rem',
-                                color: 'var(--text-prominent)',
-                            }}
-                        >
-                            <span
-                                className='digit-scanner-spinner'
-                                aria-label={localize('Scanning…')}
-                                style={{
-                                    display: 'inline-block',
-                                    width: '1.6rem',
-                                    height: '1.6rem',
-                                    border: '2px solid var(--button-primary-default)',
-                                    borderTopColor: 'transparent',
-                                    borderRadius: '50%',
-                                    animation: 'digit-scanner-spin 0.8s linear infinite',
-                                }}
-                            />
+                        <div className='digit-scanner-modal__scanning' data-testid='dt_digit_scanner_scanning'>
+                            <span className='digit-scanner-spinner' aria-label={localize('Scanning…')} />
                             {localize('Scanning volatility markets…')}
                         </div>
                     )}
 
                     {scan_status === 'error' && (
-                        <p
-                            data-testid='dt_digit_scanner_error'
-                            style={{ color: 'var(--status-danger)', padding: '0.8rem' }}
-                        >
+                        <p className='digit-scanner-modal__message digit-scanner-modal__message--error' data-testid='dt_digit_scanner_error'>
                             {error_msg}
                         </p>
                     )}
 
                     {scan_status === 'idle' && !ranking && (
-                        <p style={{ padding: '0.8rem', color: 'var(--text-less-prominent)' }}>
+                        <p className='digit-scanner-modal__message'>
                             {localize(
-                                'Click Scan to analyse the last 500 ticks of each volatility market and find digit patterns.'
+                                'Click Scan to analyse recent ticks of each volatility market and find digit patterns.'
                             )}
                         </p>
                     )}
 
                     {apply_error && (
                         <p
+                            className='digit-scanner-modal__message digit-scanner-modal__message--error'
                             data-testid='dt_digit_scanner_apply_error'
-                            style={{ color: 'var(--status-danger)', padding: '0.8rem' }}
                         >
                             {apply_error}
                         </p>
@@ -526,11 +483,16 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
 
                     {ranking && (
                         <div data-testid='dt_digit_scanner_results'>
+                            {ranking.selected && (
+                                <p className='digit-scanner-modal__selected' data-testid='dt_digit_scanner_selected'>
+                                    {`${localize('Selected')}: ${ranking.selected.analysis.symbol} · ${directionLabel(
+                                        ranking.selected.recommendation.direction
+                                    )} ${ranking.selected.recommendation.digit}`}
+                                </p>
+                            )}
+
                             {ranking.ranked.length === 0 && (
-                                <p
-                                    style={{ padding: '0.8rem', color: 'var(--text-less-prominent)' }}
-                                    data-testid='dt_digit_scanner_no_results'
-                                >
+                                <p className='digit-scanner-modal__message' data-testid='dt_digit_scanner_no_results'>
                                     {skippedMarkets.length > 0 && ranking.excluded.length === 0
                                         ? localize('No open volatility markets were available to scan.')
                                         : localize('No consensus found across any volatility market.')}
@@ -541,26 +503,14 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                 <>
                                     <table className='digit-scanner-modal__results-table'>
                                         <thead>
-                                            <tr
-                                                style={{
-                                                    borderBottom: '1px solid var(--border-normal)',
-                                                    textAlign: 'left',
-                                                    color: 'var(--text-less-prominent)',
-                                                    fontSize: '1.1rem',
-                                                }}
-                                            >
-                                                <th style={{ padding: '0.4rem 0.8rem' }}>{localize('Market')}</th>
-                                                <th style={{ padding: '0.4rem 0.8rem' }}>
-                                                    {localize('Recommendation')}
-                                                </th>
-                                                <th style={{ padding: '0.4rem 0.8rem' }}>{localize('Agreement')}</th>
-                                                <th
-                                                    title={localize('Heuristic score, not a win probability')}
-                                                    style={{ padding: '0.4rem 0.8rem' }}
-                                                >
+                                            <tr className='digit-scanner-modal__results-head'>
+                                                <th>{localize('Market')}</th>
+                                                <th>{localize('Recommendation')}</th>
+                                                <th>{localize('Agreement')}</th>
+                                                <th title={localize('Heuristic score, not a win probability')}>
                                                     {localize('Heuristic score (not a win probability)')}
                                                 </th>
-                                                <th style={{ padding: '0.4rem 0.8rem' }} />
+                                                <th />
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -589,16 +539,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
 
                             {(ranking.excluded.length > 0 || skippedMarkets.length > 0) && (
                                 <>
-                                    <p
-                                        style={{
-                                            padding: '0.8rem',
-                                            fontSize: '1.1rem',
-                                            color: 'var(--text-less-prominent)',
-                                            marginTop: '1.2rem',
-                                        }}
-                                    >
-                                        {localize('Excluded markets')}
-                                    </p>
+                                    <p className='digit-scanner-modal__excluded-title'>{localize('Excluded markets')}</p>
                                     <table className='digit-scanner-modal__excluded-table'>
                                         <tbody>
                                             {ranking.excluded.map(a => (
@@ -613,17 +554,8 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                             )}
                         </div>
                     )}
-                    <p
-                        style={{
-                            padding: '0.4rem 0.8rem',
-                            fontSize: '1.1rem',
-                            color: 'var(--text-less-prominent)',
-                            fontStyle: 'italic',
-                        }}
-                    >
-                        {localize(
-                            'Heuristics describe past noise only; they do not imply an edge or guarantee profit.'
-                        )}
+                    <p className='digit-scanner-modal__disclaimer'>
+                        {localize('Heuristics describe past noise only; they do not imply an edge or guarantee profit.')}
                     </p>
                 </div>
             </Dialog>
@@ -633,7 +565,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                 portal_element_id='modal_root'
                 title={localize('Apply to bot?')}
                 is_visible={!!confirm_state}
-                confirm_button_text={localize('Apply to bot')}
+                confirm_button_text={localize('Confirm & apply')}
                 onConfirm={handleApply}
                 is_confirm_disabled={is_running || is_applying}
                 cancel_button_text={localize('Cancel')}
@@ -650,71 +582,74 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                     data-testid='dt_digit_scanner_confirm_dialog'
                 >
                     {apply_error && (
-                        <p style={{ color: 'var(--status-danger)', marginBottom: '0.8rem' }}>{apply_error}</p>
+                        <p className='digit-scanner-modal__message digit-scanner-modal__message--error'>{apply_error}</p>
+                    )}
+                    {confirm_state && (
+                        <p className='digit-scanner-confirm-modal__summary'>
+                            {`${confirm_state.displayName ? `${confirm_state.displayName} (${confirm_state.pick.symbol})` : confirm_state.pick.symbol} · ${directionLabel(
+                                confirm_state.pick.direction
+                            )} · ${localize('digit')} ${confirm_state.pick.digit}`}
+                        </p>
                     )}
                     {preview && (
                         <table className='digit-scanner-confirm-modal__table'>
                             <thead>
-                                <tr style={{ color: 'var(--text-less-prominent)', fontSize: '1.1rem' }}>
-                                    <th style={{ padding: '0.4rem 0.8rem', textAlign: 'left' }}>
-                                        {localize('Field')}
-                                    </th>
-                                    <th style={{ padding: '0.4rem 0.8rem', textAlign: 'left' }}>
-                                        {localize('Before')}
-                                    </th>
-                                    <th style={{ padding: '0.4rem 0.8rem', textAlign: 'left' }}>
-                                        {localize('After')}
-                                    </th>
+                                <tr className='digit-scanner-confirm-modal__head'>
+                                    <th>{localize('Field')}</th>
+                                    <th>{localize('From')}</th>
+                                    <th>{localize('To')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td style={{ padding: '0.5rem 0.8rem' }}>{localize('Symbol')}</td>
-                                    <td style={{ padding: '0.5rem 0.8rem', color: 'var(--text-less-prominent)' }}>
-                                        {preview.symbol.before ?? '—'}
-                                    </td>
-                                    <td style={{ padding: '0.5rem 0.8rem', fontWeight: 600 }}>
-                                        {preview.symbol.after}
-                                    </td>
+                                    <td>{localize('Symbol')}</td>
+                                    <td className='digit-scanner-confirm-modal__before'>{preview.symbol.before ?? '—'}</td>
+                                    <td className='digit-scanner-confirm-modal__after'>{preview.symbol.after}</td>
+                                </tr>
+                                {preview.category && (
+                                    <tr>
+                                        <td>{localize('Trade type category')}</td>
+                                        <td className='digit-scanner-confirm-modal__before'>
+                                            {preview.category.before ?? '—'}
+                                        </td>
+                                        <td className='digit-scanner-confirm-modal__after'>{preview.category.after}</td>
+                                    </tr>
+                                )}
+                                {preview.tradeType && (
+                                    <tr>
+                                        <td>{localize('Trade type')}</td>
+                                        <td className='digit-scanner-confirm-modal__before'>
+                                            {preview.tradeType.before ?? '—'}
+                                        </td>
+                                        <td className='digit-scanner-confirm-modal__after'>{preview.tradeType.after}</td>
+                                    </tr>
+                                )}
+                                <tr>
+                                    <td>{localize('Contract type')}</td>
+                                    <td className='digit-scanner-confirm-modal__before'>{preview.type.before ?? '—'}</td>
+                                    <td className='digit-scanner-confirm-modal__after'>{preview.type.after}</td>
                                 </tr>
                                 <tr>
-                                    <td style={{ padding: '0.5rem 0.8rem' }}>{localize('Contract type')}</td>
-                                    <td style={{ padding: '0.5rem 0.8rem', color: 'var(--text-less-prominent)' }}>
-                                        {preview.type.before ?? '—'}
-                                    </td>
-                                    <td style={{ padding: '0.5rem 0.8rem', fontWeight: 600 }}>
-                                        {preview.type.after}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style={{ padding: '0.5rem 0.8rem' }}>{localize('Prediction digit')}</td>
-                                    <td style={{ padding: '0.5rem 0.8rem', color: 'var(--text-less-prominent)' }}>
+                                    <td>{localize('Prediction digit')}</td>
+                                    <td className='digit-scanner-confirm-modal__before'>
                                         {preview.prediction.before ?? '—'}
                                     </td>
-                                    <td style={{ padding: '0.5rem 0.8rem', fontWeight: 600 }}>
-                                        {preview.prediction.after}
-                                    </td>
+                                    <td className='digit-scanner-confirm-modal__after'>{preview.prediction.after}</td>
                                 </tr>
                             </tbody>
                         </table>
                     )}
                     {is_running && (
                         <p
+                            className='digit-scanner-modal__message digit-scanner-modal__message--error'
                             data-testid='dt_digit_scanner_bot_running_warning'
-                            style={{ marginTop: '1rem', color: 'var(--status-danger)', fontSize: '1.1rem' }}
                         >
                             {localize('Cannot apply while the bot is running.')}
                         </p>
                     )}
-                    {is_applying && (
-                        <p style={{ marginTop: '0.8rem', color: 'var(--text-less-prominent)', fontSize: '1.1rem' }}>
-                            {localize('Applying…')}
-                        </p>
-                    )}
+                    {is_applying && <p className='digit-scanner-modal__message'>{localize('Applying…')}</p>}
                 </div>
             </Dialog>
-
-            <style>{`@keyframes digit-scanner-spin { to { transform: rotate(360deg); } }`}</style>
         </>
     );
 };
