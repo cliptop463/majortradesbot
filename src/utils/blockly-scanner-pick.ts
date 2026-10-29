@@ -1,6 +1,8 @@
 export type ScannerPickDirection = 'MATCHES' | 'DIFFERS';
 
 export type ScannerPickInput = {
+    market: string;
+    submarket: string;
     symbol: string;
     direction: ScannerPickDirection;
     digit: number;
@@ -13,7 +15,12 @@ export type ScannerPickFieldPreview = {
 
 export type ScannerPickPreview = {
     ok: true;
+    direction: ScannerPickDirection;
+    market: ScannerPickFieldPreview;
+    submarket: ScannerPickFieldPreview;
     symbol: ScannerPickFieldPreview;
+    tradeTypeCategory: ScannerPickFieldPreview;
+    tradeType: ScannerPickFieldPreview;
     type: ScannerPickFieldPreview;
     prediction: ScannerPickFieldPreview;
 };
@@ -26,6 +33,8 @@ export type ScannerPickFailure = {
 export type ScannerPickResult = ScannerPickPreview | ScannerPickFailure;
 
 const FIELD_NAMES = {
+    market: 'MARKET_LIST',
+    submarket: 'SUBMARKET_LIST',
     symbol: 'SYMBOL_LIST',
     type: 'TYPE_LIST',
     prediction: 'PREDICTION',
@@ -130,6 +139,19 @@ const findRequiredBlocks = (workspace: any) => {
                 tradeTypeBlocks.length === 0
                     ? 'Missing trade_definition_tradetype block.'
                     : 'Duplicate trade_definition_tradetype blocks found.',
+        };
+    }
+
+    const requiredBlocks = [
+        ...marketBlocks,
+        ...contractTypeBlocks,
+        ...tradeOptionBlocks,
+        ...tradeTypeBlocks,
+    ];
+    if (requiredBlocks.some((block: any) => block?.getRootBlock?.() !== tradeDefinition)) {
+        return {
+            ok: false as const,
+            reason: 'Required scanner blocks are not connected to the trade_definition block.',
         };
     }
 
@@ -251,27 +273,40 @@ export const ensureMatchesDiffers = async (tradeTypeBlock: any): Promise<Scanner
 export const previewScannerPick = (workspace: any, pick: ScannerPickInput): ScannerPickResult => {
     try {
         const validatedDigit = normalizeDigit(pick.digit);
+        if (!pick.market || !pick.submarket || !pick.symbol) {
+            return { ok: false, reason: 'Scanner pick is missing market information.' };
+        }
+        if (pick.direction !== 'MATCHES' && pick.direction !== 'DIFFERS') {
+            return { ok: false, reason: 'Scanner pick has an unsupported direction.' };
+        }
+
         const required = findRequiredBlocks(workspace);
         if (!required.ok) {
             return { ok: false, reason: required.reason };
         }
 
-        const { marketBlock, contractTypeBlock, predictionBlock } = required;
+        const { marketBlock, contractTypeBlock, predictionBlock, tradeTypeBlock } = required;
 
+        const marketBefore = getFieldValue(marketBlock, FIELD_NAMES.market);
+        const submarketBefore = getFieldValue(marketBlock, FIELD_NAMES.submarket);
         const symbolBefore = getFieldValue(marketBlock, FIELD_NAMES.symbol);
+        const tradeTypeCategoryBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory);
+        const tradeTypeBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType);
         const typeBefore = getContractTypeValue(contractTypeBlock);
         const predictionBefore = getPredictionValue(predictionBlock);
 
         const targetType = pick.direction === 'MATCHES' ? 'DIGITMATCH' : 'DIGITDIFF';
-        const symbolAfter = pick.symbol;
-        const typeAfter = targetType;
-        const predictionAfter = validatedDigit;
 
         return {
             ok: true,
-            symbol: { before: symbolBefore, after: symbolAfter },
-            type: { before: typeBefore, after: typeAfter },
-            prediction: { before: predictionBefore, after: predictionAfter },
+            direction: pick.direction,
+            market: { before: marketBefore, after: pick.market },
+            submarket: { before: submarketBefore, after: pick.submarket },
+            symbol: { before: symbolBefore, after: pick.symbol },
+            tradeTypeCategory: { before: tradeTypeCategoryBefore, after: 'digits' },
+            tradeType: { before: tradeTypeBefore, after: 'matchesdiffers' },
+            type: { before: typeBefore, after: targetType },
+            prediction: { before: predictionBefore, after: validatedDigit },
         };
     } catch (error) {
         return {
@@ -300,6 +335,8 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
         const { marketBlock, contractTypeBlock, predictionBlock, tradeTypeBlock } = required;
 
         const targetType = pick.direction === 'MATCHES' ? 'DIGITMATCH' : 'DIGITDIFF';
+        const targetMarket = pick.market;
+        const targetSubmarket = pick.submarket;
         const targetSymbol = pick.symbol;
         const targetDigit = normalizeDigit(pick.digit);
 
@@ -307,8 +344,35 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
         window.Blockly.Events.setGroup('scanner-pick-apply');
 
         try {
+            const marketBefore = getFieldValue(marketBlock, FIELD_NAMES.market);
+            if (marketBefore !== targetMarket) {
+                if (!(await waitForFieldOption(marketBlock, FIELD_NAMES.market, targetMarket))) {
+                    return { ok: false, reason: `Market ${targetMarket} is unavailable in the bot workspace.` };
+                }
+                setFieldValue(marketBlock, FIELD_NAMES.market, targetMarket);
+                fireFieldChange(marketBlock, FIELD_NAMES.market, marketBefore, targetMarket);
+            }
+
+            const submarketBefore = getFieldValue(marketBlock, FIELD_NAMES.submarket);
+            if (submarketBefore !== targetSubmarket) {
+                if (!(await waitForFieldOption(marketBlock, FIELD_NAMES.submarket, targetSubmarket))) {
+                    return {
+                        ok: false,
+                        reason: `Submarket ${targetSubmarket} is unavailable for ${targetMarket}.`,
+                    };
+                }
+                setFieldValue(marketBlock, FIELD_NAMES.submarket, targetSubmarket);
+                fireFieldChange(marketBlock, FIELD_NAMES.submarket, submarketBefore, targetSubmarket);
+            }
+
             const symbolBefore = getFieldValue(marketBlock, FIELD_NAMES.symbol);
             if (symbolBefore !== targetSymbol) {
+                if (!(await waitForFieldOption(marketBlock, FIELD_NAMES.symbol, targetSymbol))) {
+                    return {
+                        ok: false,
+                        reason: `Symbol ${targetSymbol} is unavailable for ${targetSubmarket}.`,
+                    };
+                }
                 setFieldValue(marketBlock, FIELD_NAMES.symbol, targetSymbol);
                 fireFieldChange(marketBlock, FIELD_NAMES.symbol, symbolBefore, targetSymbol);
             }
@@ -349,12 +413,7 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
 
             workspace?.render?.();
 
-            return {
-                ok: true,
-                symbol: { before: symbolBefore, after: targetSymbol },
-                type: { before: typeBefore, after: targetType },
-                prediction: { before: predictionBefore, after: targetDigit },
-            };
+            return preview;
         } finally {
             if (window?.Blockly?.Events) {
                 window.Blockly.Events.setGroup(originalGroup);
@@ -381,8 +440,6 @@ export default {
     applyScannerPick,
     ensureMatchesDiffers,
 };
-
-
 
 
 

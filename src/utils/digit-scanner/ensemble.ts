@@ -105,10 +105,7 @@ export function analyzeDigits(
         }
 
         if (a.direction !== b.direction) {
-            if (directionFilter === 'MATCHES') {
-                return a.direction === 'MATCHES' ? -1 : 1;
-            }
-            return a.direction === 'DIFFERS' ? -1 : 1;
+            return a.direction === 'MATCHES' ? -1 : 1;
         }
 
         return a.digit - b.digit;
@@ -146,7 +143,8 @@ export function analyzeDigits(
 }
 
 /**
- * Ranks market analyses according to heuristic score, agreement, eligible count, and symbol name.
+ * Prioritizes MATCHES markets, then ranks by heuristic score, agreement, eligible count,
+ * and symbol name.
  * Markets that are not 'ok' or lack a recommendation are placed into `excluded` in their original order.
  */
 export function rankMarkets(analyses: MarketAnalysis[]): RankingResult {

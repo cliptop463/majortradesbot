@@ -44,7 +44,7 @@ export interface DecideFromZResult {
  * - p = 0.1, z = (count - n * p) / sqrt(n * p * (1 - p))
  * - hottest digit with z >= zMatch (default 2) -> MATCHES (strength z/4)
  * - coldest digit with z <= zDiff (default -1) -> DIFFERS (strength -z/3)
- * - If both qualify, larger strength wins; ties go to DIFFERS
+ * - If both qualify, larger strength wins; ties go to MATCHES
  * - Ties between digits go to the lowest digit
  */
 export function decideFromZ(
@@ -107,7 +107,7 @@ export function decideFromZ(
     const diffStrength = diffQualifies ? Math.min(1, Math.max(0, -minZ / 3)) : -1;
 
     if (matchQualifies && diffQualifies) {
-        if (diffStrength >= matchStrength) {
+        if (diffStrength > matchStrength) {
             return {
                 direction: 'DIFFERS',
                 digit: coldestDigit,

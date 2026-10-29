@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { analyzeDigits, rankMarkets } from '../ensemble';
+import { decideFromZ } from '../strategies';
 import type { MarketAnalysis, StrategyResult } from '../types';
 
 describe('analyzeDigits', () => {
@@ -116,15 +117,15 @@ describe('analyzeDigits', () => {
             expect(res.recommendation?.agree).toBe(2);
         });
 
-        it('tie-break step 3: DIFFERS beats MATCHES when strength and votes are tied', () => {
+        it('tie-break step 3: MATCHES beats DIFFERS when strength and votes are tied', () => {
             const sM = (): StrategyResult => ({ id: '1', name: '1', status: 'signal', direction: 'MATCHES', digit: 5, strength: 0.7, reason: '' });
             const sD = (): StrategyResult => ({ id: '2', name: '2', status: 'signal', direction: 'DIFFERS', digit: 5, strength: 0.7, reason: '' });
 
             const res1 = analyzeDigits([1, 2], { minAgree: 1, strategies: [sM, sD] });
-            expect(res1.recommendation?.direction).toBe('DIFFERS');
+            expect(res1.recommendation?.direction).toBe('MATCHES');
 
             const res2 = analyzeDigits([1, 2], { minAgree: 1, strategies: [sD, sM] });
-            expect(res2.recommendation?.direction).toBe('DIFFERS');
+            expect(res2.recommendation?.direction).toBe('MATCHES');
         });
 
         it('tie-break step 4: lower digit wins when strength, votes, and direction are tied', () => {
@@ -133,6 +134,14 @@ describe('analyzeDigits', () => {
 
             const res = analyzeDigits([1, 2], { minAgree: 1, strategies: [s9, s2] });
             expect(res.recommendation?.digit).toBe(2);
+        });
+
+        it('prefers MATCHES when a strategy has equally strong MATCHES and DIFFERS signals', () => {
+            const zScores = new Array(10).fill(0);
+            zScores[2] = 4;
+            zScores[8] = -3;
+
+            expect(decideFromZ(zScores)).toMatchObject({ direction: 'MATCHES', digit: 2 });
         });
     });
 });
