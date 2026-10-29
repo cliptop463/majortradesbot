@@ -593,3 +593,28 @@
 .digit-scanner-confirm-modal__after {
     font-weight: 600;
 }
+
+/* Mobile: keep strategy status words and market names from breaking mid-word */
+@media (max-width: 600px) {
+    .digit-scanner-modal__expanded-cell {
+        padding: 0 0.4rem 0.8rem;
+    }
+
+    .digit-scanner-modal__strategy-table {
+        th,
+        td {
+            padding: 0.3rem 0.4rem;
+        }
+
+        th:nth-child(2),
+        td:nth-child(2) {
+            white-space: nowrap;
+        }
+    }
+
+    .digit-scanner-modal__excluded-table .digit-scanner-modal__cell--compact:first-child {
+        min-width: 9rem;
+        word-break: normal;
+        overflow-wrap: normal;
+    }
+}
