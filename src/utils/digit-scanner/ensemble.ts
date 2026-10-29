@@ -16,164 +16,157 @@ interface GroupedVote {
     strengthSum: number;
 }
 
+/**
+ * Consensus rules:
+ * 1) A strategy must return a well-formed signal to vote.
+ * 2) The largest vote count wins before strength is considered.
+ * 3) Equal vote counts are broken by mean strength, then DIFFERS before MATCHES,
+ *    then the lower digit. This ordering is deterministic and input-order independent.
+ * 4) The heuristic score is a ranking index, not a calibrated probability.
+ */
 export interface AnalyzeDigitsOptions {
     minAgree?: number;
     strategies?: readonly ((digits: readonly number[]) => StrategyResult)[];
     directionFilter?: 'ALL' | 'MATCHES' | 'DIFFERS';
 }
 
-/**
- * Runs all provided strategies against the historical digit sequence and computes
- * an ensemble consensus.
- */
+const isValidSignal = (s: StrategyResult): s is StrategyResult & {
+    direction: Direction;
+    digit: number;
+    strength: number;
+} =>
+    s.status === 'signal' &&
+    (s.direction === 'MATCHES' || s.direction === 'DIFFERS') &&
+    Number.isInteger(s.digit) &&
+    (s.digit as number) >= 0 &&
+    (s.digit as number) <= 9 &&
+    Number.isFinite(s.strength) &&
+    (s.strength as number) >= 0 &&
+    (s.strength as number) <= 1;
+
 export function analyzeDigits(
     digits: readonly number[],
     options?: AnalyzeDigitsOptions
 ): EnsembleResult {
     const directionFilter = options?.directionFilter ?? 'ALL';
-    const minAgree = options?.minAgree ?? (directionFilter === 'MATCHES' ? 1 : 2);
+    const minAgree = Math.max(1, Math.floor(options?.minAgree ?? 2));
     const strategiesList = options?.strategies ?? STRATEGIES;
 
-    const strategies: StrategyResult[] = strategiesList.map((fn) => fn(digits));
-    const eligible = strategies.filter((s) => s.status !== 'ineligible');
-    const eligibleCount = eligible.length;
-
-    if (eligibleCount === 0) {
+    if (
+        digits.length === 0 ||
+        digits.some(d => !Number.isInteger(d) || d < 0 || d > 9)
+    ) {
         return {
-            strategies,
+            strategies: [],
             recommendation: null,
-            reason: 'No eligible strategies.',
+            reason: 'Invalid digit sequence: expected a non-empty array of integers from 0 to 9.',
         };
     }
 
-    const signals = strategies.filter((s) => s.status === 'signal');
+    const strategies: StrategyResult[] = strategiesList.map(fn => fn(digits));
+    const eligible = strategies.filter(s => s.status !== 'ineligible');
+    const eligibleCount = eligible.length;
+    if (eligibleCount === 0) {
+        return { strategies, recommendation: null, reason: 'No eligible strategies.' };
+    }
+
+    const signals = strategies.filter(isValidSignal);
     if (signals.length === 0) {
-        return {
-            strategies,
-            recommendation: null,
-            reason: 'No strategy produced a signal.',
-        };
+        return { strategies, recommendation: null, reason: 'No strategy produced a valid signal.' };
     }
 
     const groupsMap = new Map<string, GroupedVote>();
-    for (const sig of signals) {
-        if (!sig.direction || sig.digit === undefined) continue;
-        const key = `${sig.direction}:${sig.digit}`;
-        const strength = sig.strength ?? 0;
-        const existing = groupsMap.get(key);
-        if (existing) {
-            existing.votes++;
-            existing.strengthSum += strength;
+    for (const signal of signals) {
+        const key = `${signal.direction}:${signal.digit}`;
+        const group = groupsMap.get(key);
+        if (group) {
+            group.votes += 1;
+            group.strengthSum += signal.strength;
         } else {
             groupsMap.set(key, {
-                direction: sig.direction,
-                digit: sig.digit,
+                direction: signal.direction,
+                digit: signal.digit,
                 votes: 1,
-                strengthSum: strength,
+                strengthSum: signal.strength,
             });
         }
     }
 
-    let groups = Array.from(groupsMap.values());
+    let groups = [...groupsMap.values()];
+    if (directionFilter !== 'ALL') {
+        groups = groups.filter(g => g.direction === directionFilter);
+    }
     if (groups.length === 0) {
         return {
             strategies,
             recommendation: null,
-            reason: 'No strategy produced a valid signal.',
+            reason: `No valid ${directionFilter} strategy signal.`,
         };
     }
 
-    if (directionFilter !== 'ALL') {
-        groups = groups.filter((g) => g.direction === directionFilter);
-        if (groups.length === 0) {
-            return {
-                strategies,
-                recommendation: null,
-                reason: `No strategy produced a ${directionFilter} signal.`,
-            };
-        }
-    }
-
-    groups.sort((a, b) => {
-        const strengthDiff = a.strengthSum - b.strengthSum;
-        if (Math.abs(strengthDiff) > 1e-6) {
-            return strengthDiff > 0 ? -1 : 1;
-        }
-
-        if (a.votes !== b.votes) {
-            return b.votes - a.votes;
-        }
-
-        if (a.direction !== b.direction) {
-            if (directionFilter === 'MATCHES') {
-                return a.direction === 'MATCHES' ? -1 : 1;
-            }
-            return a.direction === 'DIFFERS' ? -1 : 1;
-        }
-
-        return a.digit - b.digit;
-    });
+    groups.sort((a, b) =>
+        b.votes - a.votes ||
+        (b.strengthSum / b.votes) - (a.strengthSum / a.votes) ||
+        (a.direction === b.direction ? 0 : a.direction === 'DIFFERS' ? -1 : 1) ||
+        a.digit - b.digit
+    );
 
     const winner = groups[0];
-
     if (winner.votes < minAgree) {
         return {
             strategies,
             recommendation: null,
-            reason: `Consensus not reached: winner has ${winner.votes} vote(s), minimum required is ${minAgree}.`,
+            reason: `Consensus not reached: ${winner.votes} vote(s); ${minAgree} required.`,
         };
     }
 
-    const rawScore = (100 * winner.strengthSum) / eligibleCount;
-    const heuristicScore = Math.round(rawScore * 10) / 10;
-
-    const agree = winner.votes;
-    const disagree = signals.length - agree;
+    const meanStrength = winner.strengthSum / winner.votes;
+    const agreementShare = winner.votes / eligibleCount;
+    // Transparent composite index: 70% consensus share + 30% mean heuristic strength.
+    // It is not a probability of winning.
+    const heuristicScore = Math.round(
+        (100 * (0.7 * agreementShare + 0.3 * meanStrength)) * 10
+    ) / 10;
 
     const recommendation: Recommendation = {
         direction: winner.direction,
         digit: winner.digit,
-        agree,
-        disagree,
+        agree: winner.votes,
+        disagree: signals.filter(s =>
+            s.direction !== winner.direction || s.digit !== winner.digit
+        ).length,
         eligible: eligibleCount,
         heuristicScore,
     };
 
-    return {
-        strategies,
-        recommendation,
-    };
+    return { strategies, recommendation };
 }
 
 /**
- * Ranks market analyses according to heuristic score, agreement, eligible count, and symbol name.
- * Markets that are not 'ok' or lack a recommendation are placed into `excluded` in their original order.
+ * Deterministic market ranking:
+ * score descending, agreement count descending, observation count descending,
+ * then symbol ascending (case-sensitive lexical order). No direction is privileged.
+ * Failed, insufficient, or non-consensus markets are excluded, never scored as zero.
  */
 export function rankMarkets(analyses: MarketAnalysis[]): RankingResult {
-    const okWithRec = analyses.filter(
+    const eligible = analyses.filter(
         (a): a is MarketAnalysis & { recommendation: Recommendation } =>
-            a.status === 'ok' && a.recommendation !== null
+            a.status === 'ok' &&
+            a.recommendation !== null &&
+            Number.isFinite(a.recommendation.heuristicScore)
     );
+    const excluded = analyses.filter(a => !(
+        a.status === 'ok' &&
+        a.recommendation !== null &&
+        Number.isFinite(a.recommendation.heuristicScore)
+    ));
 
-    const excluded = analyses.filter((a) => a.status !== 'ok' || a.recommendation === null);
-
-    const sorted = [...okWithRec].sort((a, b) => {
-        if (a.recommendation.direction !== b.recommendation.direction) {
-            return a.recommendation.direction === 'MATCHES' ? -1 : 1;
-        }
-        if (b.recommendation.heuristicScore !== a.recommendation.heuristicScore) {
-            return b.recommendation.heuristicScore - a.recommendation.heuristicScore;
-        }
-        if (b.recommendation.agree !== a.recommendation.agree) {
-            return b.recommendation.agree - a.recommendation.agree;
-        }
-        if (b.recommendation.eligible !== a.recommendation.eligible) {
-            return b.recommendation.eligible - a.recommendation.eligible;
-        }
-        if (a.symbol < b.symbol) return -1;
-        if (a.symbol > b.symbol) return 1;
-        return 0;
-    });
+    const sorted = [...eligible].sort((a, b) =>
+        b.recommendation.heuristicScore - a.recommendation.heuristicScore ||
+        b.recommendation.agree - a.recommendation.agree ||
+        b.observations - a.observations ||
+        (a.symbol < b.symbol ? -1 : a.symbol > b.symbol ? 1 : 0)
+    );
 
     const ranked: RankedMarket[] = sorted.map((analysis, index) => ({
         rank: index + 1,
@@ -181,9 +174,5 @@ export function rankMarkets(analyses: MarketAnalysis[]): RankingResult {
         recommendation: analysis.recommendation,
     }));
 
-    return {
-        ranked,
-        selected: ranked[0] ?? null,
-        excluded,
-    };
+    return { ranked, selected: ranked[0] ?? null, excluded };
 }
