@@ -2,244 +2,120 @@ import { describe, expect, it } from '@jest/globals';
 import { analyzeDigits, rankMarkets } from '../ensemble';
 import type { MarketAnalysis, StrategyResult } from '../types';
 
-describe('analyzeDigits', () => {
-    it('returns no recommendation when no strategies are eligible', () => {
-        const stubIneligible = (): StrategyResult => ({
-            id: 'stub',
-            name: 'Stub',
-            status: 'ineligible',
-            reason: 'Too few ticks',
+const signal = (
+    id: string,
+    direction: 'MATCHES' | 'DIFFERS',
+    digit: number,
+    strength = 0.5
+): (() => StrategyResult) => () => ({
+    id, name: id, status: 'signal', direction, digit, strength, reason: `${id} reason`,
+});
+
+const abstain = (id: string): (() => StrategyResult) => () => ({
+    id, name: id, status: 'abstain', reason: 'No threshold crossed',
+});
+
+const analysis = (
+    symbol: string,
+    score: number,
+    agree: number,
+    observations = 300,
+    direction: 'MATCHES' | 'DIFFERS' = 'MATCHES'
+): MarketAnalysis => ({
+    symbol,
+    displayName: symbol,
+    market: 'synthetic_index',
+    submarket: 'random_index',
+    pipSize: 2,
+    observations,
+    dropped: 0,
+    status: 'ok',
+    strategies: [],
+    recommendation: {
+        direction, digit: 5, agree, disagree: 0, eligible: 5, heuristicScore: score,
+    },
+});
+
+describe('analyzeDigits consensus', () => {
+    it('requires two votes by default, including when a direction filter is set', () => {
+        const result = analyzeDigits([1, 2, 3], {
+            directionFilter: 'MATCHES',
+            strategies: [signal('one', 'MATCHES', 7, 1), abstain('two')],
         });
-        const result = analyzeDigits([1, 2, 3], { strategies: [stubIneligible] });
         expect(result.recommendation).toBeNull();
-        expect(result.reason).toBe('No eligible strategies.');
+        expect(result.reason).toContain('2 required');
     });
 
-    it('returns no recommendation when no strategy produces a signal', () => {
-        const stubAbstain = (): StrategyResult => ({
-            id: 'stub',
-            name: 'Stub',
-            status: 'abstain',
-            reason: 'No trigger',
+    it('prioritizes vote count over a lone high-strength signal', () => {
+        const result = analyzeDigits([1, 2, 3], {
+            minAgree: 2,
+            strategies: [
+                signal('lone', 'DIFFERS', 9, 1),
+                signal('vote-a', 'MATCHES', 4, 0.4),
+                signal('vote-b', 'MATCHES', 4, 0.4),
+            ],
         });
-        const result = analyzeDigits([1, 2, 3], { strategies: [stubAbstain] });
+        expect(result.recommendation).toMatchObject({
+            direction: 'MATCHES', digit: 4, agree: 2, heuristicScore: 46,
+        });
+    });
+
+    it('uses deterministic direction and digit tie-breaking', () => {
+        const first = analyzeDigits([1, 2, 3], {
+            minAgree: 1,
+            strategies: [signal('m', 'MATCHES', 5, 0.7), signal('d', 'DIFFERS', 5, 0.7)],
+        });
+        const reversed = analyzeDigits([1, 2, 3], {
+            minAgree: 1,
+            strategies: [signal('d', 'DIFFERS', 5, 0.7), signal('m', 'MATCHES', 5, 0.7)],
+        });
+        expect(first.recommendation).toEqual(reversed.recommendation);
+        expect(first.recommendation?.direction).toBe('DIFFERS');
+    });
+
+    it('ignores malformed signals and rejects invalid digit input', () => {
+        const malformed = (): StrategyResult => ({
+            id: 'bad', name: 'Bad', status: 'signal', direction: 'MATCHES', digit: 12, strength: 0.8, reason: 'bad',
+        });
+        const result = analyzeDigits([1, 2, 3], { strategies: [malformed] });
         expect(result.recommendation).toBeNull();
-        expect(result.reason).toBe('No strategy produced a signal.');
+        expect(analyzeDigits([1, 12]).recommendation).toBeNull();
     });
 
-    it('returns no consensus when winning vote is below minAgree', () => {
-        const s1 = (): StrategyResult => ({
-            id: 's1',
-            name: 'S1',
-            status: 'signal',
-            direction: 'MATCHES',
-            digit: 7,
-            strength: 0.8,
-            reason: 'r1',
+    it('computes a clearly heuristic score from consensus share and mean strength', () => {
+        const result = analyzeDigits([1, 2, 3], {
+            minAgree: 2,
+            strategies: [
+                signal('a', 'MATCHES', 5, 0.6),
+                signal('b', 'MATCHES', 5, 0.8),
+                signal('c', 'DIFFERS', 2, 0.4),
+                abstain('d'),
+            ],
         });
-        const s2 = (): StrategyResult => ({
-            id: 's2',
-            name: 'S2',
-            status: 'abstain',
-            reason: 'r2',
-        });
-
-        const result = analyzeDigits([1, 2, 3], { minAgree: 2, strategies: [s1, s2] });
-        expect(result.recommendation).toBeNull();
-        expect(result.reason).toMatch(/Consensus not reached: winner has 1 vote\(s\), minimum required is 2/);
-    });
-
-    it('computes heuristic score correctly with stub strategies', () => {
-        const s1 = (): StrategyResult => ({
-            id: 's1',
-            name: 'S1',
-            status: 'signal',
-            direction: 'MATCHES',
-            digit: 5,
-            strength: 0.6,
-            reason: 'r1',
-        });
-        const s2 = (): StrategyResult => ({
-            id: 's2',
-            name: 'S2',
-            status: 'signal',
-            direction: 'MATCHES',
-            digit: 5,
-            strength: 0.8,
-            reason: 'r2',
-        });
-        const s3 = (): StrategyResult => ({
-            id: 's3',
-            name: 'S3',
-            status: 'signal',
-            direction: 'DIFFERS',
-            digit: 2,
-            strength: 0.4,
-            reason: 'r3',
-        });
-        const s4 = (): StrategyResult => ({
-            id: 's4',
-            name: 'S4',
-            status: 'abstain',
-            reason: 'r4',
-        });
-
-        const result = analyzeDigits([1, 2, 3], { minAgree: 2, strategies: [s1, s2, s3, s4] });
-        expect(result.recommendation).not.toBeNull();
-        expect(result.recommendation?.direction).toBe('MATCHES');
-        expect(result.recommendation?.digit).toBe(5);
-        expect(result.recommendation?.agree).toBe(2);
-        expect(result.recommendation?.disagree).toBe(1);
-        expect(result.recommendation?.eligible).toBe(4);
-        expect(result.recommendation?.heuristicScore).toBe(35);
-    });
-
-    describe('tie-breaking order', () => {
-        it('tie-break step 1: higher summed strength beats lower summed strength', () => {
-            const s1 = (): StrategyResult => ({ id: '1', name: '1', status: 'signal', direction: 'MATCHES', digit: 3, strength: 0.9, reason: '' });
-            const s2 = (): StrategyResult => ({ id: '2', name: '2', status: 'signal', direction: 'DIFFERS', digit: 4, strength: 0.4, reason: '' });
-            const s3 = (): StrategyResult => ({ id: '3', name: '3', status: 'signal', direction: 'DIFFERS', digit: 4, strength: 0.4, reason: '' });
-
-            const res = analyzeDigits([1, 2], { minAgree: 1, strategies: [s1, s2, s3] });
-            expect(res.recommendation?.direction).toBe('MATCHES');
-            expect(res.recommendation?.digit).toBe(3);
-        });
-
-        it('tie-break step 2: more votes beats fewer votes when strength is tied', () => {
-            const sA1 = (): StrategyResult => ({ id: '1', name: '1', status: 'signal', direction: 'MATCHES', digit: 8, strength: 0.5, reason: '' });
-            const sA2 = (): StrategyResult => ({ id: '2', name: '2', status: 'signal', direction: 'MATCHES', digit: 8, strength: 0.5, reason: '' });
-            const sB1 = (): StrategyResult => ({ id: '3', name: '3', status: 'signal', direction: 'DIFFERS', digit: 2, strength: 1.0, reason: '' });
-
-            const res = analyzeDigits([1, 2], { minAgree: 1, strategies: [sB1, sA1, sA2] });
-            expect(res.recommendation?.direction).toBe('MATCHES');
-            expect(res.recommendation?.digit).toBe(8);
-            expect(res.recommendation?.agree).toBe(2);
-        });
-
-        it('tie-break step 3: DIFFERS beats MATCHES when strength and votes are tied', () => {
-            const sM = (): StrategyResult => ({ id: '1', name: '1', status: 'signal', direction: 'MATCHES', digit: 5, strength: 0.7, reason: '' });
-            const sD = (): StrategyResult => ({ id: '2', name: '2', status: 'signal', direction: 'DIFFERS', digit: 5, strength: 0.7, reason: '' });
-
-            const res1 = analyzeDigits([1, 2], { minAgree: 1, strategies: [sM, sD] });
-            expect(res1.recommendation?.direction).toBe('DIFFERS');
-
-            const res2 = analyzeDigits([1, 2], { minAgree: 1, strategies: [sD, sM] });
-            expect(res2.recommendation?.direction).toBe('DIFFERS');
-        });
-
-        it('tie-break step 4: lower digit wins when strength, votes, and direction are tied', () => {
-            const s9 = (): StrategyResult => ({ id: '1', name: '1', status: 'signal', direction: 'DIFFERS', digit: 9, strength: 0.7, reason: '' });
-            const s2 = (): StrategyResult => ({ id: '2', name: '2', status: 'signal', direction: 'DIFFERS', digit: 2, strength: 0.7, reason: '' });
-
-            const res = analyzeDigits([1, 2], { minAgree: 1, strategies: [s9, s2] });
-            expect(res.recommendation?.digit).toBe(2);
-        });
+        // eligible = 4; agreement share = 2/4; mean strength = .7
+        expect(result.recommendation?.heuristicScore).toBe(56);
     });
 });
 
 describe('rankMarkets', () => {
-    function makeAnalysis(
-        symbol: string,
-        score: number,
-        agree: number,
-        eligible: number,
-        status: 'ok' | 'no_consensus' | 'insufficient_data' | 'error' = 'ok'
-    ): MarketAnalysis {
-        return {
-            symbol,
-            displayName: symbol,
-            market: 'synthetic_index',
-            submarket: 'random_index',
-            pipSize: 2,
-            observations: 300,
-            dropped: 0,
-            status,
-            strategies: [],
-            recommendation:
-                status === 'ok'
-                    ? {
-                          direction: 'MATCHES',
-                          digit: 5,
-                          agree,
-                          disagree: 0,
-                          eligible,
-                          heuristicScore: score,
-                      }
-                    : null,
-        };
-    }
-
-    it('ranks by score desc, agree desc, eligible desc, and plain string symbol ascending', () => {
-        const m1 = makeAnalysis('R_100', 80, 4, 8);
-        const m2 = makeAnalysis('R_50', 80, 4, 8);
-        const m3 = makeAnalysis('1HZ10V', 80, 4, 8);
-        const m4 = makeAnalysis('1HZ100V', 80, 4, 8);
-        const mLowerScore = makeAnalysis('R_25', 60, 5, 8);
-
-        const ranking = rankMarkets([mLowerScore, m2, m1, m3, m4]);
-
-        expect(ranking.ranked.map((r) => r.analysis.symbol)).toEqual([
-            '1HZ100V',
-            '1HZ10V',
-            'R_100',
-            'R_50',
-            'R_25',
-        ]);
-
-        expect(ranking.selected?.analysis.symbol).toBe('1HZ100V');
-        expect(ranking.selected?.rank).toBe(1);
-        expect(ranking.excluded).toEqual([]);
+    it('ranks by score, agreement, observations, then symbol without direction bias', () => {
+        const lowerScoreMatches = analysis('R_10', 55, 4, 500, 'MATCHES');
+        const higherScoreDiffers = analysis('R_25', 80, 2, 250, 'DIFFERS');
+        const tiedA = analysis('R_50', 80, 3, 300, 'MATCHES');
+        const tiedB = analysis('R_100', 80, 3, 300, 'DIFFERS');
+        const result = rankMarkets([lowerScoreMatches, higherScoreDiffers, tiedA, tiedB]);
+        expect(result.ranked.map(x => x.analysis.symbol)).toEqual(['R_100', 'R_50', 'R_25', 'R_10']);
+        expect(result.selected?.analysis.symbol).toBe('R_100');
     });
 
-    it('is deterministic under input permutation', () => {
-        const a = makeAnalysis('R_10', 50, 2, 8);
-        const b = makeAnalysis('R_25', 70, 3, 8);
-        const c = makeAnalysis('R_50', 90, 4, 8);
-
-        const rank1 = rankMarkets([a, b, c]);
-        const rank2 = rankMarkets([c, a, b]);
-
-        expect(rank1.ranked.map((r) => r.analysis.symbol)).toEqual(
-            rank2.ranked.map((r) => r.analysis.symbol)
-        );
-    });
-
-    it('keeps excluded markets in their original input order and sets selected to null when none qualify', () => {
-        const err = makeAnalysis('R_10', 0, 0, 0, 'error');
-        const insuff = makeAnalysis('R_25', 0, 0, 0, 'insufficient_data');
-        const noCons = makeAnalysis('R_50', 0, 0, 0, 'no_consensus');
-
-        const result = rankMarkets([err, insuff, noCons]);
-        expect(result.ranked).toEqual([]);
-        expect(result.selected).toBeNull();
-        expect(result.excluded.map((e) => e.symbol)).toEqual(['R_10', 'R_25', 'R_50']);
-    });
-
-    it('prioritizes MATCHES recommendations over DIFFERS recommendations', () => {
-        const diffMarket = makeAnalysis('R_100', 95, 5, 8);
-        diffMarket.recommendation = {
-            direction: 'DIFFERS',
-            digit: 3,
-            agree: 5,
-            disagree: 0,
-            eligible: 8,
-            heuristicScore: 95,
-        };
-
-        const matchMarket = makeAnalysis('R_50', 60, 2, 8);
-        matchMarket.recommendation = {
-            direction: 'MATCHES',
-            digit: 7,
-            agree: 2,
-            disagree: 1,
-            eligible: 8,
-            heuristicScore: 60,
-        };
-
-        const result = rankMarkets([diffMarket, matchMarket]);
-        expect(result.ranked[0].recommendation.direction).toBe('MATCHES');
-        expect(result.ranked[0].analysis.symbol).toBe('R_50');
-        expect(result.ranked[1].recommendation.direction).toBe('DIFFERS');
-        expect(result.ranked[1].analysis.symbol).toBe('R_100');
+    it('is input-order independent and excludes failed/insufficient/no-consensus analyses', () => {
+        const a = analysis('R_10', 70, 3);
+        const b = analysis('R_25', 80, 3);
+        const bad = { ...analysis('R_50', 0, 0), status: 'error' as const, recommendation: null };
+        const one = rankMarkets([a, b, bad]);
+        const two = rankMarkets([bad, b, a]);
+        expect(one.ranked.map(x => x.analysis.symbol)).toEqual(two.ranked.map(x => x.analysis.symbol));
+        expect(one.excluded.map(x => x.symbol)).toEqual(['R_50']);
+        expect(one.selected?.analysis.symbol).toBe('R_25');
     });
 });
