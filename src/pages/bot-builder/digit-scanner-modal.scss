@@ -618,3 +618,83 @@
         overflow-wrap: normal;
     }
 }
+
+
+/* ── Trade type / strategy selection ─────────────────────────────────────── */
+
+.digit-scanner-modal__controls {
+    padding: 0 0.8rem 0.8rem;
+}
+
+.digit-scanner-modal__controls-label {
+    margin: 0.8rem 0 0.4rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__segment {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.digit-scanner-modal__segment-button,
+.digit-scanner-modal__chip {
+    min-height: 3.2rem;
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--border-normal);
+    border-radius: 1.6rem;
+    background: transparent;
+    color: var(--text-prominent);
+    font-size: 1.2rem;
+    cursor: pointer;
+
+    &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    &--active {
+        border-color: var(--button-primary-default);
+        background: var(--button-primary-default);
+        color: var(--text-colored-background, #fff);
+    }
+}
+
+.digit-scanner-modal__chip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.digit-scanner-modal__chip-actions {
+    display: inline-flex;
+    gap: 0.8rem;
+}
+
+.digit-scanner-modal__link-button {
+    padding: 0.2rem;
+    border: none;
+    background: none;
+    color: var(--button-primary-default);
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.digit-scanner-modal__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.digit-scanner-modal__hint {
+    margin-top: 0.6rem;
+    font-size: 1.1rem;
+    color: var(--text-less-prominent);
+}
+
+.digit-scanner-modal__settings--flush {
+    padding-left: 0;
+    padding-right: 0;
+}

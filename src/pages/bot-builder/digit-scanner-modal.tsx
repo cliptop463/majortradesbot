@@ -6,7 +6,10 @@ import { localize } from '@deriv-com/translations';
 import { fetchHistory, scanMarkets, selectVolatilityMarkets } from '@/utils/digit-scanner/scan';
 import type { SkippedMarket } from '@/utils/digit-scanner/scan';
 import { rankMarkets } from '@/utils/digit-scanner/ensemble';
-import type { MarketAnalysis, RankingResult, RankedMarket, StrategyResult } from '@/utils/digit-scanner/types';
+import type { Direction, MarketAnalysis, RankingResult, RankedMarket, StrategyResult } from '@/utils/digit-scanner/types';
+import { CONTRACTS, TRADE_KINDS, TRADE_KIND_LABELS, formatPick } from '@/utils/digit-scanner/contracts';
+import type { TradeKind } from '@/utils/digit-scanner/contracts';
+import { PATTERN_STRATEGY_IDS, PATTERN_STRATEGY_INFO, analyzePattern } from '@/utils/digit-scanner/pattern-strategies';
 import { previewScannerPick, applyScannerPick } from '@/utils/blockly-scanner-pick';
 import type { ScannerPickPreview } from '@/utils/blockly-scanner-pick';
 import './digit-scanner-modal.scss';
@@ -21,12 +24,14 @@ type Props = {
 type ScanStatus = 'idle' | 'scanning' | 'done' | 'error';
 
 type ConfirmState = {
-    pick: { symbol: string; direction: 'MATCHES' | 'DIFFERS'; digit: number };
+    pick: { symbol: string; direction: Direction; digit: number | null };
     preview: ScannerPickPreview;
     displayName?: string;
 } | null;
 
-const directionLabel = (d: string) => (d === 'MATCHES' ? 'Matches' : 'Differs');
+type Engine = 'statistical' | 'pattern';
+
+const directionLabel = (d: string) => CONTRACTS[d as Direction]?.label ?? d;
 
 const DEFAULT_MIN_TICKS = 200;
 const MIN_TICKS_FLOOR = 50;
@@ -52,9 +57,7 @@ const StrategyRow: React.FC<{ s: StrategyResult }> = ({ s }) => (
     <tr className='digit-scanner-modal__strategy-table-row'>
         <td>{s.name}</td>
         <td>
-            {s.status === 'signal' && s.direction !== undefined && s.digit !== undefined
-                ? `${directionLabel(s.direction)} ${s.digit}`
-                : s.status}
+            {s.status === 'signal' && s.direction !== undefined ? formatPick(s.direction, s.digit) : s.status}
         </td>
         <td className='digit-scanner-modal__strategy-table-reason'>{s.reason}</td>
     </tr>
@@ -91,8 +94,7 @@ const RankedRow: React.FC<{
                     <span className='digit-scanner-modal__row-symbol'>{analysis.symbol}</span>
                 </td>
                 <td className='digit-scanner-modal__cell'>
-                    <strong>{directionLabel(recommendation.direction)}</strong> digit{' '}
-                    <strong>{recommendation.digit}</strong>
+                    <strong>{formatPick(recommendation.direction, recommendation.digit)}</strong>
                 </td>
                 <td className='digit-scanner-modal__cell'>
                     {recommendation.agree}/{recommendation.eligible} agree
@@ -172,7 +174,7 @@ const RankedCard: React.FC<{
                 <div className='digit-scanner-modal__card-metric'>
                     <span className='digit-scanner-modal__card-label'>{localize('Recommendation')}</span>
                     <strong>
-                        {directionLabel(recommendation.direction)} {localize('digit')} {recommendation.digit}
+                        {formatPick(recommendation.direction, recommendation.digit)}
                     </strong>
                 </div>
                 <div className='digit-scanner-modal__card-metric'>
@@ -200,10 +202,8 @@ const RankedCard: React.FC<{
                             <div className='digit-scanner-modal__strategy-row'>
                                 <span className='digit-scanner-modal__strategy-row-label'>{localize('Signal')}</span>
                                 <span className='digit-scanner-modal__strategy-row-value'>
-                                    {strategy.status === 'signal' &&
-                                    strategy.direction !== undefined &&
-                                    strategy.digit !== undefined
-                                        ? `${directionLabel(strategy.direction)} ${strategy.digit}`
+                                    {strategy.status === 'signal' && strategy.direction !== undefined
+                                        ? formatPick(strategy.direction, strategy.digit)
                                         : strategy.status}
                                 </span>
                             </div>
@@ -295,6 +295,46 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
     const [apply_error, setApplyError] = React.useState('');
     const [is_applying, setIsApplying] = React.useState(false);
     const [min_ticks_input, setMinTicksInput] = React.useState(String(DEFAULT_MIN_TICKS));
+    const [trade_kind, setTradeKind] = React.useState<TradeKind>('matches_differs');
+    const [engine, setEngine] = React.useState<Engine>('statistical');
+    const [selected_strategies, setSelectedStrategies] = React.useState<string[]>([...PATTERN_STRATEGY_IDS]);
+    const [min_agree_input, setMinAgreeInput] = React.useState('1');
+
+    // Even/Odd and Over/Under only have the pattern strategies.
+    const active_engine: Engine = trade_kind === 'matches_differs' ? engine : 'pattern';
+    const parsed_min_agree = Number.parseInt(min_agree_input, 10);
+    const is_min_agree_valid =
+        Number.isInteger(parsed_min_agree) && parsed_min_agree >= 1 && parsed_min_agree <= Math.max(1, selected_strategies.length);
+
+    const resetResults = () => {
+        setScanStatus('idle');
+        setErrorMsg('');
+        setRanking(null);
+        setSkippedMarkets([]);
+        setApplyError('');
+    };
+    const chooseKind = (kind: TradeKind) => {
+        if (scan_status === 'scanning' || kind === trade_kind) return;
+        setTradeKind(kind);
+        resetResults();
+    };
+    const chooseEngine = (next: Engine) => {
+        if (scan_status === 'scanning' || next === engine) return;
+        setEngine(next);
+        resetResults();
+    };
+    const toggleStrategy = (id: string) => {
+        if (scan_status === 'scanning') return;
+        setSelectedStrategies(current =>
+            current.includes(id) ? current.filter(x => x !== id) : PATTERN_STRATEGY_IDS.filter(x => x === id || current.includes(x))
+        );
+        resetResults();
+    };
+    const setAllStrategies = (all: boolean) => {
+        if (scan_status === 'scanning') return;
+        setSelectedStrategies(all ? [...PATTERN_STRATEGY_IDS] : []);
+        resetResults();
+    };
 
     const parsed_min_ticks = Number.parseInt(min_ticks_input, 10);
     const is_min_ticks_valid =
@@ -311,6 +351,22 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
             );
             setScanStatus('error');
             return;
+        }
+        if (active_engine === 'pattern') {
+            if (selected_strategies.length === 0) {
+                setErrorMsg(localize('Select at least one strategy.'));
+                setScanStatus('error');
+                return;
+            }
+            if (!is_min_agree_valid) {
+                setErrorMsg(
+                    localize('Minimum agreeing strategies must be a whole number from 1 to {{max}}.', {
+                        max: selected_strategies.length,
+                    })
+                );
+                setScanStatus('error');
+                return;
+            }
         }
         setScanStatus('scanning');
         setErrorMsg('');
@@ -349,6 +405,15 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                 minObservations: parsed_min_ticks,
                 concurrency: 3,
                 timeout: 10000,
+                ...(active_engine === 'pattern'
+                    ? {
+                          analyze: (digits: readonly number[]) =>
+                              analyzePattern(digits, trade_kind, {
+                                  strategyIds: selected_strategies,
+                                  minAgree: parsed_min_agree,
+                              }),
+                      }
+                    : {}),
             });
 
             setRanking(rankMarkets(analyses));
@@ -430,6 +495,129 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                     className='digit-scanner-modal__content'
                     data-testid='dt_digit_scanner_modal_content'
                 >
+                    <div className='digit-scanner-modal__controls' data-testid='dt_digit_scanner_controls'>
+                        <p className='digit-scanner-modal__controls-label'>{localize('Trade type')}</p>
+                        <div className='digit-scanner-modal__segment' role='group' aria-label={localize('Trade type')}>
+                            {TRADE_KINDS.map(kind => (
+                                <button
+                                    key={kind}
+                                    type='button'
+                                    data-testid={`dt_digit_scanner_kind_${kind}`}
+                                    aria-pressed={trade_kind === kind}
+                                    disabled={scan_status === 'scanning'}
+                                    className={`digit-scanner-modal__segment-button${
+                                        trade_kind === kind ? ' digit-scanner-modal__segment-button--active' : ''
+                                    }`}
+                                    onClick={() => chooseKind(kind)}
+                                >
+                                    {localize(TRADE_KIND_LABELS[kind])}
+                                </button>
+                            ))}
+                        </div>
+
+                        {trade_kind === 'matches_differs' && (
+                            <>
+                                <p className='digit-scanner-modal__controls-label'>{localize('Strategy set')}</p>
+                                <div className='digit-scanner-modal__segment' role='group' aria-label={localize('Strategy set')}>
+                                    {(['statistical', 'pattern'] as Engine[]).map(option => (
+                                        <button
+                                            key={option}
+                                            type='button'
+                                            data-testid={`dt_digit_scanner_engine_${option}`}
+                                            aria-pressed={engine === option}
+                                            disabled={scan_status === 'scanning'}
+                                            className={`digit-scanner-modal__segment-button${
+                                                engine === option ? ' digit-scanner-modal__segment-button--active' : ''
+                                            }`}
+                                            onClick={() => chooseEngine(option)}
+                                        >
+                                            {option === 'statistical'
+                                                ? localize('Statistical (conservative)')
+                                                : localize('Pattern strategies')}
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        {active_engine === 'statistical' ? (
+                            <p className='digit-scanner-modal__hint'>
+                                {localize('Conservative statistical ensemble. Signals are rare by design.')}
+                            </p>
+                        ) : (
+                            <>
+                                <div className='digit-scanner-modal__chip-header'>
+                                    <p className='digit-scanner-modal__controls-label'>
+                                        {localize('Strategies')} ({selected_strategies.length}/{PATTERN_STRATEGY_INFO.length})
+                                    </p>
+                                    <span className='digit-scanner-modal__chip-actions'>
+                                        <button
+                                            type='button'
+                                            className='digit-scanner-modal__link-button'
+                                            data-testid='dt_digit_scanner_strategies_all'
+                                            onClick={() => setAllStrategies(true)}
+                                        >
+                                            {localize('All')}
+                                        </button>
+                                        <button
+                                            type='button'
+                                            className='digit-scanner-modal__link-button'
+                                            data-testid='dt_digit_scanner_strategies_none'
+                                            onClick={() => setAllStrategies(false)}
+                                        >
+                                            {localize('None')}
+                                        </button>
+                                    </span>
+                                </div>
+                                <div className='digit-scanner-modal__chips'>
+                                    {PATTERN_STRATEGY_INFO.map(info => {
+                                        const on = selected_strategies.includes(info.id);
+                                        return (
+                                            <button
+                                                key={info.id}
+                                                type='button'
+                                                data-testid={`dt_digit_scanner_strategy_${info.id}`}
+                                                aria-pressed={on}
+                                                title={info.caution ? `${info.summary} ${info.caution}` : info.summary}
+                                                disabled={scan_status === 'scanning'}
+                                                className={`digit-scanner-modal__chip${
+                                                    on ? ' digit-scanner-modal__chip--active' : ''
+                                                }`}
+                                                onClick={() => toggleStrategy(info.id)}
+                                            >
+                                                {info.name}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <div className='digit-scanner-modal__settings digit-scanner-modal__settings--flush'>
+                                    <label className='digit-scanner-modal__settings-label' htmlFor='digit-scanner-min-agree'>
+                                        {localize('Minimum agreeing strategies')}
+                                    </label>
+                                    <input
+                                        id='digit-scanner-min-agree'
+                                        data-testid='dt_digit_scanner_min_agree'
+                                        className={`digit-scanner-modal__settings-input${
+                                            is_min_agree_valid ? '' : ' digit-scanner-modal__settings-input--invalid'
+                                        }`}
+                                        type='number'
+                                        inputMode='numeric'
+                                        min={1}
+                                        max={Math.max(1, selected_strategies.length)}
+                                        value={min_agree_input}
+                                        disabled={scan_status === 'scanning'}
+                                        onChange={e => setMinAgreeInput(e.target.value)}
+                                    />
+                                </div>
+                                <p className='digit-scanner-modal__hint'>
+                                    {localize(
+                                        'Pattern strategies use looser thresholds, so they signal more often. A signal describes past ticks, not the next one.'
+                                    )}
+                                </p>
+                            </>
+                        )}
+                    </div>
+
                     <div className='digit-scanner-modal__settings'>
                         <label className='digit-scanner-modal__settings-label' htmlFor='digit-scanner-min-ticks'>
                             {localize('Minimum ticks per market')}
@@ -485,9 +673,10 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                         <div data-testid='dt_digit_scanner_results'>
                             {ranking.selected && (
                                 <p className='digit-scanner-modal__selected' data-testid='dt_digit_scanner_selected'>
-                                    {`${localize('Selected')}: ${ranking.selected.analysis.symbol} · ${directionLabel(
-                                        ranking.selected.recommendation.direction
-                                    )} ${ranking.selected.recommendation.digit}`}
+                                    {`${localize('Selected')}: ${ranking.selected.analysis.symbol} · ${formatPick(
+                                        ranking.selected.recommendation.direction,
+                                        ranking.selected.recommendation.digit
+                                    )}`}
                                 </p>
                             )}
 
@@ -586,9 +775,10 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                     )}
                     {confirm_state && (
                         <p className='digit-scanner-confirm-modal__summary'>
-                            {`${confirm_state.displayName ? `${confirm_state.displayName} (${confirm_state.pick.symbol})` : confirm_state.pick.symbol} · ${directionLabel(
-                                confirm_state.pick.direction
-                            )} · ${localize('digit')} ${confirm_state.pick.digit}`}
+                            {`${confirm_state.displayName ? `${confirm_state.displayName} (${confirm_state.pick.symbol})` : confirm_state.pick.symbol} · ${formatPick(
+                                confirm_state.pick.direction,
+                                confirm_state.pick.digit
+                            )}`}
                         </p>
                     )}
                     {preview && (
