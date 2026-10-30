@@ -2,7 +2,7 @@ import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import type { ActiveSymbol } from './types';
 import { checkPrecision, extractLastDigits, pipDecimals } from './digits';
 import { analyzeDigits } from './ensemble';
-import type { MarketAnalysis } from './types';
+import type { EnsembleResult, MarketAnalysis } from './types';
 
 export const SCAN_DEFAULTS = {
     count: 500,
@@ -29,6 +29,11 @@ export interface ScanMarketsOptions {
     timeout?: number;
     directionFilter?: 'ALL' | 'MATCHES' | 'DIFFERS';
     minAgree?: number;
+    /**
+     * Replaces the default statistical ensemble, e.g. with a selected set of pattern strategies for
+     * Even/Odd or Over/Under. Data-quality checks (precision, minimum ticks) still run first.
+     */
+    analyze?: (digits: readonly number[]) => EnsembleResult;
 }
 
 export async function fetchHistory(
@@ -229,10 +234,12 @@ export async function scanMarkets(
             };
         }
 
-        const ensemble = analyzeDigits(digits, {
-            directionFilter: options?.directionFilter,
-            minAgree: options?.minAgree,
-        });
+        const ensemble = options?.analyze
+            ? options.analyze(digits)
+            : analyzeDigits(digits, {
+                  directionFilter: options?.directionFilter,
+                  minAgree: options?.minAgree,
+              });
 
         if (!ensemble.recommendation) {
             return {

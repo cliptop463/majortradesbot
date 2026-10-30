@@ -12,7 +12,7 @@ export type ActiveSymbol = ActiveSymbols[number] & {
     exchange_is_open?: 0 | 1 | boolean;
 };
 
-export type Direction = 'MATCHES' | 'DIFFERS';
+export type Direction = 'MATCHES' | 'DIFFERS' | 'EVEN' | 'ODD' | 'OVER' | 'UNDER';
 
 export type StrategySignal = Direction | 'ABSTAIN';
 
@@ -20,9 +20,10 @@ export interface StrategyResult {
     id: string;
     name: string;
     status: 'signal' | 'abstain' | 'ineligible';
-    /** Independent per-strategy vote: MATCHES / DIFFERS, or ABSTAIN when preconditions are not met. */
+    /** Independent per-strategy vote (MATCHES, DIFFERS, EVEN, ODD, OVER or UNDER), or ABSTAIN when preconditions are not met. */
     signal: StrategySignal;
     direction?: Direction;
+    /** Prediction digit (barrier). Absent for Even/Odd. */
     digit?: number;
     strength?: number;
     reason: string;
@@ -30,7 +31,8 @@ export interface StrategyResult {
 
 export interface Recommendation {
     direction: Direction;
-    digit: number;
+    /** Prediction digit (barrier); null for Even/Odd, which has none. */
+    digit: number | null;
     agree: number;
     disagree: number;
     eligible: number;
