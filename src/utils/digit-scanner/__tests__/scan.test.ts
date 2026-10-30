@@ -93,3 +93,34 @@ describe('digit scanner scan utilities', () => {
         expect(result[0].recommendation).toBeNull();
     });
 });
+
+describe('scanMarkets data-quality guards', () => {
+    const market = () => [makeSymbol({ symbol: 'R_100', underlying_symbol: 'R_100', pip_size: 0.01 })];
+    const randomish = (n: number) => Array.from({ length: n }, (_, i) => Number((100 + ((i * 37) % 100) / 100 + Math.floor(i / 100)).toFixed(2)));
+
+    it('excludes a market whose prices do not match the configured precision', async () => {
+        // Prices only show 1 decimal place while the pip says 2: last digits would be padded zeros.
+        const prices = Array.from({ length: 300 }, (_, i) => Number((100 + (i % 10) / 10).toFixed(1)));
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
+        expect(result.status).toBe('error');
+        expect(result.message).toContain('Precision mismatch');
+        expect(result.recommendation).toBeNull();
+    });
+
+    it('excludes a degenerate digit stream instead of recommending it', async () => {
+        const prices = Array.from({ length: 300 }, (_, i) => Number((100 + i * 0.1 + 0.05).toFixed(2)));
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
+        expect(result.status).toBe('error');
+        expect(result.message).toContain('degenerate');
+        expect(result.recommendation).toBeNull();
+    });
+
+    it('still analyses a market whose precision matches', async () => {
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices: randomish(300) });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
+        expect(result.status).not.toBe('error');
+    });
+});
+
