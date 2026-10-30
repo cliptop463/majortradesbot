@@ -1,6 +1,6 @@
 import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import type { ActiveSymbol } from './types';
-import { extractLastDigits, pipDecimals } from './digits';
+import { checkPrecision, extractLastDigits, pipDecimals } from './digits';
 import { analyzeDigits } from './ensemble';
 import type { MarketAnalysis } from './types';
 
@@ -188,6 +188,30 @@ export async function scanMarkets(
         }
 
         const { digits, dropped } = extractLastDigits(rawHistory.prices, pipSize);
+
+        const failed = (message: string): MarketAnalysis => ({
+            symbol,
+            displayName,
+            market: market.market || '',
+            submarket: market.submarket || '',
+            pipSize,
+            observations: digits.length,
+            dropped,
+            status: 'error',
+            message,
+            strategies: [],
+            recommendation: null,
+        });
+
+        if (digits.length >= minObservations) {
+            const precision = checkPrecision(rawHistory.prices, pipSize);
+            if (!precision.ok) return failed(precision.reason ?? 'Precision mismatch.');
+            if (new Set(digits).size < 3) {
+                return failed(
+                    `Digit stream looks degenerate (only ${new Set(digits).size} distinct digit(s) in ${digits.length} ticks); likely a feed or precision problem.`
+                );
+            }
+        }
 
         if (digits.length < minObservations) {
             return {

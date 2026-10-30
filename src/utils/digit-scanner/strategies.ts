@@ -88,6 +88,19 @@ export function decideFromZ(
     return { direction: 'MATCHES', digit: hotDigit, strength: hotStrength, z: hotZ };
 }
 
+/** Strongest single-digit reading, for explaining why a strategy abstained. Not a signal. */
+export function strongestReading(zScores: readonly number[]): string {
+    let best = 0;
+    for (let d = 1; d < zScores.length; d++) if (Math.abs(zScores[d]) > Math.abs(zScores[best])) best = d;
+    const z = zScores[best] ?? 0;
+    return `Strongest reading: digit ${best} z=${z.toFixed(2)} (needs >= ${THRESHOLDS.zMatch} hot or <= ${THRESHOLDS.zDiff} cold). Not a signal.`;
+}
+
+const zScoresOf = (counts: readonly number[], n: number): number[] => {
+    const expected = n / 10, sd = Math.sqrt(n * 0.1 * 0.9);
+    return Array.from({ length: 10 }, (_, d) => (sd > 0 ? ((counts[d] ?? 0) - expected) / sd : 0));
+};
+
 const invalidDigitSequence = (digits: readonly number[]) =>
     digits.some(d => !Number.isInteger(d) || d < 0 || d > 9);
 
@@ -110,7 +123,7 @@ export function frequencyStrategy(digits: readonly number[]): StrategyResult {
     if (invalidDigitSequence(digits)) return noSignal(id, name, 'Invalid digit sequence.');
     const counts = countsOf(digits);
     const d = decideFromZ(counts, digits.length);
-    if (!d) return noSignal(id, name, `No digit crossed the conservative z threshold in ${digits.length} ticks.`);
+    if (!d) return noSignal(id, name, `No digit crossed the conservative z threshold in ${digits.length} ticks. ${strongestReading(zScoresOf(counts, digits.length))}`);
     return {
         id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
         reason: zReason(d, `Digit ${d.digit} occurred ${counts[d.digit]}/${digits.length} times`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
@@ -130,7 +143,7 @@ export function recencyStrategy(digits: readonly number[]): StrategyResult {
     const nEff = sumW * sumW / sumW2;
     const effectiveCounts = weights.map(w => w / sumW * nEff);
     const d = decideFromZ(effectiveCounts, nEff);
-    if (!d) return noSignal(id, name, `Recency-weighted digit shares did not cross threshold (effective N=${nEff.toFixed(1)}).`);
+    if (!d) return noSignal(id, name, `Recency-weighted digit shares did not cross threshold (effective N=${nEff.toFixed(1)}). ${strongestReading(zScoresOf(effectiveCounts, nEff))}`);
     return {
         id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
         reason: zReason(d, `Digit ${d.digit} has ${(100 * weights[d.digit] / sumW).toFixed(1)}% of exponentially weighted share (half-life 50 ticks)`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
@@ -165,7 +178,7 @@ export function momentumStrategy(digits: readonly number[]): StrategyResult {
         return se > 0 ? (p1 - p2) / se : 0;
     });
     const d = decideFromZ(zs, { zMatch: THRESHOLDS.zMatch, zDiff: THRESHOLDS.momentumZDiff });
-    if (!d) return noSignal(id, name, 'No digit share shift crossed the conservative two-window threshold.');
+    if (!d) return noSignal(id, name, `No digit share shift crossed the conservative two-window threshold. ${strongestReading(zs)}`);
     return {
         id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
         reason: zReason(d, `Digit ${d.digit}: ${(100 * recentC[d.digit] / 50).toFixed(1)}% in last 50 ticks vs ${(100 * priorC[d.digit] / 100).toFixed(1)}% in prior 100`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.momentumZDiff)),
@@ -201,7 +214,7 @@ export function transitionsStrategy(digits: readonly number[]): StrategyResult {
     for (let i = 0; i < digits.length - 1; i++) if (digits[i] === current) successors.push(digits[i + 1]);
     if (successors.length < THRESHOLDS.transitionsMinSuccessors) return noSignal(id, name, `Only ${successors.length} historical successors for digit ${current}; ${THRESHOLDS.transitionsMinSuccessors} required.`, 'ineligible');
     const counts = countsOf(successors), d = decideFromZ(counts, successors.length);
-    if (!d) return noSignal(id, name, `Successor distribution after digit ${current} did not cross threshold.`);
+    if (!d) return noSignal(id, name, `Successor distribution after digit ${current} did not cross threshold. ${strongestReading(zScoresOf(counts, successors.length))}`);
     return {
         id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
         reason: zReason(d, `Digit ${d.digit} followed current digit ${current} ${counts[d.digit]}/${successors.length} times`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
