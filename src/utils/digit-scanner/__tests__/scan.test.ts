@@ -122,5 +122,34 @@ describe('scanMarkets data-quality guards', () => {
         const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
         expect(result.status).not.toBe('error');
     });
+
+    it('uses a supplied analyzer instead of the default ensemble, after the data-quality checks', async () => {
+        const analyze = jest.fn().mockReturnValue({
+            strategies: [],
+            recommendation: { direction: 'EVEN', digit: null, agree: 2, disagree: 0, eligible: 3, heuristicScore: 71 },
+        });
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices: randomish(300) });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, {
+            count: 300,
+            minObservations: 200,
+            analyze: analyze as any,
+        });
+        expect(analyze).toHaveBeenCalledTimes(1);
+        expect((analyze.mock.calls[0][0] as number[]).length).toBe(300);
+        expect(result.recommendation?.direction).toBe('EVEN');
+    });
+
+    it('does not call the analyzer for a market that fails the precision check', async () => {
+        const analyze = jest.fn();
+        const prices = Array.from({ length: 300 }, (_, i) => Number((100 + (i % 10) / 10).toFixed(1)));
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, {
+            count: 300,
+            minObservations: 200,
+            analyze: analyze as any,
+        });
+        expect(analyze).not.toHaveBeenCalled();
+        expect(result.status).toBe('error');
+    });
 });
 
