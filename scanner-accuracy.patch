@@ -1,0 +1,401 @@
+diff --git a/src/utils/digit-scanner/README.md b/src/utils/digit-scanner/README.md
+new file mode 100644
+index 0000000..dab306d
+--- /dev/null
++++ b/src/utils/digit-scanner/README.md
+@@ -0,0 +1,25 @@
++# Digit scanner: assumptions and limitations
++
++## What it does
++1. Fetches recent ticks per volatility market through the project's existing authorized connection (`api_base.api.send`).
++2. Extracts the last displayed digit using the market's precision. Precision comes from the `active_symbols` pip value and is cross-checked against the prices themselves (`checkPrecision`). A mismatch, or a degenerate digit stream, excludes the market with a reason instead of analysing it.
++3. Runs eight independent heuristics (frequency, recency, streak, momentum, distribution skew, transitions, gaps, cycles). Each returns `MATCHES`, `DIFFERS` or `ABSTAIN` with a reason.
++4. Combines them: the most-voted `direction:digit` wins, and at least 2 votes are required. The heuristic score is `70% agreement share + 30% mean strength`. It is a ranking index, not a probability.
++5. Ranks markets by score, agreeing strategies, eligible strategies, then symbol (deterministic).
++6. Previews every Blockly field that would change and applies only after explicit confirmation. It never starts the bot or places a trade.
++
++## Assumptions
++- Digits are described by their recent history only. Thresholds are deliberately conservative (z >= 2.8, chi-square >= 21.67, streak >= 4, cycle z >= 3.8).
++- Price history is ordered oldest to newest.
++
++## Limitations
++- **Volatility indices are designed to produce independent, uniformly distributed digits.** If that holds, no statistic of past digits predicts the next one, and no strategy has an edge. The scanner can only describe past samples.
++- **Most scans find nothing, by design.** On fair random data roughly 1-2% of markets pass the consensus rule, so a 13-market scan shows a result about one time in six. Loosening thresholds only adds false signals.
++- **False positives exist.** A market that passes on random data is noise. Scanning many markets and keeping the best one inflates apparent strength (selection bias).
++- **Strategies are not fully independent.** Frequency, recency, skew and transitions are built from the same digit counts, so "N agree" overstates independent evidence.
++- **Gaps never votes.** Treating a long gap as "due" is the gambler's fallacy, so it only reports the gap and abstains.
++- **The score is uncalibrated.** It has not been validated as a win probability and must not be read as one.
++- Nothing here guarantees profit. Backtest or walk-forward results describe one sample and do not guarantee future results.
++
++## Validating
++`backtestDigits(digits, { window, step })` (`backtest.ts`) scores each pick against the next tick and compares the hit rate with the fair baseline (10% for Matches, 90% for Differs). Overlapping windows are correlated, so the z-score is indicative only.
+diff --git a/src/utils/digit-scanner/__tests__/backtest.test.ts b/src/utils/digit-scanner/__tests__/backtest.test.ts
+new file mode 100644
+index 0000000..c3ad38d
+--- /dev/null
++++ b/src/utils/digit-scanner/__tests__/backtest.test.ts
+@@ -0,0 +1,40 @@
++import { describe, expect, it } from '@jest/globals';
++import { backtestDigits } from '../backtest';
++
++const makeRng = (seed: number) => () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
++const uniform = (n: number, seed: number) => {
++    const rnd = makeRng(seed);
++    return Array.from({ length: n }, () => Math.floor(rnd() * 10));
++};
++const biased = (n: number, seed: number, digit: number, p: number) => {
++    const rnd = makeRng(seed);
++    return Array.from({ length: n }, () => (rnd() < p ? digit : Math.floor(rnd() * 10)));
++};
++
++describe('backtestDigits', () => {
++    it('reports insufficient data when there is not more history than the window', () => {
++        const result = backtestDigits(uniform(300, 1), { window: 500 });
++        expect(result.verdict).toBe('insufficient_data');
++        expect(result.signals).toBe(0);
++    });
++
++    it('finds no evidence of edge on fair random digits', () => {
++        const result = backtestDigits(uniform(6000, 7), { window: 500, step: 25 });
++        expect(result.windows).toBeGreaterThan(100);
++        expect(['no_signals', 'no_evidence_of_edge']).toContain(result.verdict);
++    });
++
++    it('scores a persistent planted bias above the 10% Matches baseline', () => {
++        const result = backtestDigits(biased(6000, 11, 7, 0.2), { window: 500, step: 25 });
++        expect(result.matches.signals).toBeGreaterThan(0);
++        expect(result.hitRate).not.toBeNull();
++        expect(result.hitRate as number).toBeGreaterThan(0.15);
++        expect(result.verdict).toBe('above_baseline');
++    });
++
++    it('uses only past ticks: a bias that appears after the window is not credited', () => {
++        const digits = [...uniform(1000, 3), ...Array.from({ length: 500 }, () => 7)];
++        const early = backtestDigits(digits.slice(0, 1000), { window: 500, step: 50 });
++        expect(['no_signals', 'no_evidence_of_edge']).toContain(early.verdict);
++    });
++});
+diff --git a/src/utils/digit-scanner/__tests__/digits.test.ts b/src/utils/digit-scanner/__tests__/digits.test.ts
+index 0730c1c..bfae2a4 100644
+--- a/src/utils/digit-scanner/__tests__/digits.test.ts
++++ b/src/utils/digit-scanner/__tests__/digits.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, it } from '@jest/globals';
+-import { extractLastDigits, pipDecimals, pipSizeFromPip, getLastDigit } from '../digits';
++import { extractLastDigits, pipDecimals, pipSizeFromPip, getLastDigit, checkPrecision, decimalPlaces } from '../digits';
+ 
+ describe('pipDecimals', () => {
+     it('derives correct decimal places from standard pip values', () => {
+@@ -71,3 +71,33 @@ describe('extractLastDigits', () => {
+         expect(() => extractLastDigits([100], NaN)).toThrow(RangeError);
+     });
+ });
++
++describe('precision cross-check', () => {
++    const prices = (decimals: number, n = 300) =>
++        Array.from({ length: n }, (_, i) => Number((100 + (i * 0.137) % 1 + i * 10 ** -decimals).toFixed(decimals)));
++
++    it('counts decimal places, including trailing-zero loss and exponents', () => {
++        expect(decimalPlaces(1234.5)).toBe(1);
++        expect(decimalPlaces(1234.56)).toBe(2);
++        expect(decimalPlaces(100)).toBe(0);
++        expect(decimalPlaces(1e-7)).toBe(7);
++    });
++
++    it('accepts prices whose observed precision matches the configured pip size', () => {
++        expect(checkPrecision(prices(2), 2).ok).toBe(true);
++        expect(checkPrecision(prices(4), 4).ok).toBe(true);
++    });
++
++    it('rejects a pip size that is too low or too high for the prices', () => {
++        const tooLow = checkPrecision(prices(2), 0);
++        expect(tooLow.ok).toBe(false);
++        const tooHigh = checkPrecision(prices(2), 4);
++        expect(tooHigh.ok).toBe(false);
++        expect(tooHigh.reason).toContain('Precision mismatch');
++    });
++
++    it('rejects when there are no valid prices', () => {
++        expect(checkPrecision([], 2).ok).toBe(false);
++        expect(checkPrecision('nope', 2).ok).toBe(false);
++    });
++});
+diff --git a/src/utils/digit-scanner/__tests__/scan.test.ts b/src/utils/digit-scanner/__tests__/scan.test.ts
+index 0df9d3c..44f78f3 100644
+--- a/src/utils/digit-scanner/__tests__/scan.test.ts
++++ b/src/utils/digit-scanner/__tests__/scan.test.ts
+@@ -93,3 +93,34 @@ describe('digit scanner scan utilities', () => {
+         expect(result[0].recommendation).toBeNull();
+     });
+ });
++
++describe('scanMarkets data-quality guards', () => {
++    const market = () => [makeSymbol({ symbol: 'R_100', underlying_symbol: 'R_100', pip_size: 0.01 })];
++    const randomish = (n: number) => Array.from({ length: n }, (_, i) => Number((100 + ((i * 37) % 100) / 100 + Math.floor(i / 100)).toFixed(2)));
++
++    it('excludes a market whose prices do not match the configured precision', async () => {
++        // Prices only show 1 decimal place while the pip says 2: last digits would be padded zeros.
++        const prices = Array.from({ length: 300 }, (_, i) => Number((100 + (i % 10) / 10).toFixed(1)));
++        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices });
++        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
++        expect(result.status).toBe('error');
++        expect(result.message).toContain('Precision mismatch');
++        expect(result.recommendation).toBeNull();
++    });
++
++    it('excludes a degenerate digit stream instead of recommending it', async () => {
++        const prices = Array.from({ length: 300 }, (_, i) => Number((100 + i * 0.1 + 0.05).toFixed(2)));
++        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices });
++        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
++        expect(result.status).toBe('error');
++        expect(result.message).toContain('degenerate');
++        expect(result.recommendation).toBeNull();
++    });
++
++    it('still analyses a market whose precision matches', async () => {
++        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices: randomish(300) });
++        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
++        expect(result.status).not.toBe('error');
++    });
++});
++
+diff --git a/src/utils/digit-scanner/backtest.ts b/src/utils/digit-scanner/backtest.ts
+new file mode 100644
+index 0000000..6c3c5a9
+--- /dev/null
++++ b/src/utils/digit-scanner/backtest.ts
+@@ -0,0 +1,78 @@
++import { analyzeDigits } from './ensemble';
++import type { AnalyzeDigitsOptions } from './ensemble';
++
++export interface BacktestOptions extends AnalyzeDigitsOptions {
++    /** Ticks of history shown to the ensemble at each step (default 500). */
++    window?: number;
++    /** Ticks to advance between evaluations (default 25). */
++    step?: number;
++}
++
++export interface BacktestSide {
++    signals: number;
++    hits: number;
++}
++
++export interface BacktestResult {
++    windows: number;
++    signals: number;
++    matches: BacktestSide;
++    differs: BacktestSide;
++    hitRate: number | null;
++    /** Hit rate expected if the digits were fair and independent: 10% for Matches, 90% for Differs. */
++    baselineHitRate: number | null;
++    /** (hits - expected) / standard deviation. Overlapping windows are correlated, so treat as indicative only. */
++    zScore: number | null;
++    verdict: 'insufficient_data' | 'no_signals' | 'no_evidence_of_edge' | 'above_baseline' | 'below_baseline';
++}
++
++/**
++ * Walk-forward check of the ensemble: at each step the ensemble sees only past ticks and its
++ * MATCHES/DIFFERS pick is scored against the NEXT tick. Compares the hit rate with what a fair
++ * random digit would give. This measures this sample only; it cannot prove future performance.
++ */
++export function backtestDigits(digits: readonly number[], options?: BacktestOptions): BacktestResult {
++    const window = Math.max(50, Math.floor(options?.window ?? 500));
++    const step = Math.max(1, Math.floor(options?.step ?? 25));
++    const empty: BacktestResult = {
++        windows: 0, signals: 0,
++        matches: { signals: 0, hits: 0 }, differs: { signals: 0, hits: 0 },
++        hitRate: null, baselineHitRate: null, zScore: null, verdict: 'insufficient_data',
++    };
++    if (digits.length <= window) return empty;
++
++    const matches: BacktestSide = { signals: 0, hits: 0 };
++    const differs: BacktestSide = { signals: 0, hits: 0 };
++    let windows = 0;
++
++    for (let t = window; t < digits.length; t += step) {
++        windows++;
++        const { recommendation } = analyzeDigits(digits.slice(t - window, t), options);
++        if (!recommendation) continue;
++        const next = digits[t];
++        if (recommendation.direction === 'MATCHES') {
++            matches.signals++;
++            if (next === recommendation.digit) matches.hits++;
++        } else {
++            differs.signals++;
++            if (next !== recommendation.digit) differs.hits++;
++        }
++    }
++
++    const signals = matches.signals + differs.signals;
++    if (signals === 0) return { ...empty, windows, verdict: 'no_signals' };
++
++    const hits = matches.hits + differs.hits;
++    const expected = matches.signals * 0.1 + differs.signals * 0.9;
++    const sd = Math.sqrt(signals * 0.09);
++    const zScore = (hits - expected) / sd;
++    const verdict = zScore >= 2 ? 'above_baseline' : zScore <= -2 ? 'below_baseline' : 'no_evidence_of_edge';
++
++    return {
++        windows, signals, matches, differs,
++        hitRate: hits / signals,
++        baselineHitRate: expected / signals,
++        zScore,
++        verdict,
++    };
++}
+diff --git a/src/utils/digit-scanner/digits.ts b/src/utils/digit-scanner/digits.ts
+index 0f1375d..2403d91 100644
+--- a/src/utils/digit-scanner/digits.ts
++++ b/src/utils/digit-scanner/digits.ts
+@@ -80,4 +80,48 @@ export function extractLastDigits(
+     return { digits, dropped };
+ }
+ 
++/** Number of decimal places in the shortest decimal representation of a finite number. */
++export function decimalPlaces(value: number): number {
++    if (!Number.isFinite(value)) return 0;
++    const text = String(value);
++    const exponent = text.match(/e-(\d+)$/i);
++    if (exponent) {
++        const mantissaDecimals = text.split('e')[0].split('.')[1]?.length ?? 0;
++        return parseInt(exponent[1], 10) + mantissaDecimals;
++    }
++    return text.split('.')[1]?.length ?? 0;
++}
++
++export interface PrecisionCheck {
++    ok: boolean;
++    observed: number;
++    /** Present when ok is false. */
++    reason?: string;
++}
++
++/**
++ * Cross-checks the configured precision against the prices themselves.
++ *
++ * Prices arrive as JSON numbers, so trailing zeros are lost ("1234.50" -> 1234.5), but across a few
++ * hundred ticks at least one price shows the full precision. If the configured pipSize differs from
++ * the most decimals ever seen, the extracted "last digit" would be wrong (pipSize too low) or padded
++ * with artificial zeros (pipSize too high). Either way the digit stream is not trustworthy, so the
++ * market must be excluded instead of analysed.
++ */
++export function checkPrecision(prices: unknown, pipSize: number): PrecisionCheck {
++    const valid = Array.isArray(prices)
++        ? prices.filter((p): p is number => typeof p === 'number' && Number.isFinite(p))
++        : [];
++    if (valid.length === 0) {
++        return { ok: false, observed: 0, reason: 'No valid prices to verify precision.' };
++    }
++    const observed = valid.reduce((max, p) => Math.max(max, decimalPlaces(p)), 0);
++    if (observed === pipSize) return { ok: true, observed };
++    return {
++        ok: false,
++        observed,
++        reason: `Precision mismatch: configured ${pipSize} decimal place(s) but prices show ${observed}. Last digits would be unreliable.`,
++    };
++}
++
+ export type { ActiveSymbol };
+diff --git a/src/utils/digit-scanner/scan.ts b/src/utils/digit-scanner/scan.ts
+index 39b6bdc..45f2c00 100644
+--- a/src/utils/digit-scanner/scan.ts
++++ b/src/utils/digit-scanner/scan.ts
+@@ -1,6 +1,6 @@
+ import { api_base } from '@/external/bot-skeleton/services/api/api-base';
+ import type { ActiveSymbol } from './types';
+-import { extractLastDigits, pipDecimals } from './digits';
++import { checkPrecision, extractLastDigits, pipDecimals } from './digits';
+ import { analyzeDigits } from './ensemble';
+ import type { MarketAnalysis } from './types';
+ 
+@@ -189,6 +189,30 @@ export async function scanMarkets(
+ 
+         const { digits, dropped } = extractLastDigits(rawHistory.prices, pipSize);
+ 
++        const failed = (message: string): MarketAnalysis => ({
++            symbol,
++            displayName,
++            market: market.market || '',
++            submarket: market.submarket || '',
++            pipSize,
++            observations: digits.length,
++            dropped,
++            status: 'error',
++            message,
++            strategies: [],
++            recommendation: null,
++        });
++
++        if (digits.length >= minObservations) {
++            const precision = checkPrecision(rawHistory.prices, pipSize);
++            if (!precision.ok) return failed(precision.reason ?? 'Precision mismatch.');
++            if (new Set(digits).size < 3) {
++                return failed(
++                    `Digit stream looks degenerate (only ${new Set(digits).size} distinct digit(s) in ${digits.length} ticks); likely a feed or precision problem.`
++                );
++            }
++        }
++
+         if (digits.length < minObservations) {
+             return {
+                 symbol,
+diff --git a/src/utils/digit-scanner/strategies.ts b/src/utils/digit-scanner/strategies.ts
+index b55e406..9915c64 100644
+--- a/src/utils/digit-scanner/strategies.ts
++++ b/src/utils/digit-scanner/strategies.ts
+@@ -88,6 +88,19 @@ export function decideFromZ(
+     return { direction: 'MATCHES', digit: hotDigit, strength: hotStrength, z: hotZ };
+ }
+ 
++/** Strongest single-digit reading, for explaining why a strategy abstained. Not a signal. */
++export function strongestReading(zScores: readonly number[]): string {
++    let best = 0;
++    for (let d = 1; d < zScores.length; d++) if (Math.abs(zScores[d]) > Math.abs(zScores[best])) best = d;
++    const z = zScores[best] ?? 0;
++    return `Strongest reading: digit ${best} z=${z.toFixed(2)} (needs >= ${THRESHOLDS.zMatch} hot or <= ${THRESHOLDS.zDiff} cold). Not a signal.`;
++}
++
++const zScoresOf = (counts: readonly number[], n: number): number[] => {
++    const expected = n / 10, sd = Math.sqrt(n * 0.1 * 0.9);
++    return Array.from({ length: 10 }, (_, d) => (sd > 0 ? ((counts[d] ?? 0) - expected) / sd : 0));
++};
++
+ const invalidDigitSequence = (digits: readonly number[]) =>
+     digits.some(d => !Number.isInteger(d) || d < 0 || d > 9);
+ 
+@@ -110,7 +123,7 @@ export function frequencyStrategy(digits: readonly number[]): StrategyResult {
+     if (invalidDigitSequence(digits)) return noSignal(id, name, 'Invalid digit sequence.');
+     const counts = countsOf(digits);
+     const d = decideFromZ(counts, digits.length);
+-    if (!d) return noSignal(id, name, `No digit crossed the conservative z threshold in ${digits.length} ticks.`);
++    if (!d) return noSignal(id, name, `No digit crossed the conservative z threshold in ${digits.length} ticks. ${strongestReading(zScoresOf(counts, digits.length))}`);
+     return {
+         id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
+         reason: zReason(d, `Digit ${d.digit} occurred ${counts[d.digit]}/${digits.length} times`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
+@@ -130,7 +143,7 @@ export function recencyStrategy(digits: readonly number[]): StrategyResult {
+     const nEff = sumW * sumW / sumW2;
+     const effectiveCounts = weights.map(w => w / sumW * nEff);
+     const d = decideFromZ(effectiveCounts, nEff);
+-    if (!d) return noSignal(id, name, `Recency-weighted digit shares did not cross threshold (effective N=${nEff.toFixed(1)}).`);
++    if (!d) return noSignal(id, name, `Recency-weighted digit shares did not cross threshold (effective N=${nEff.toFixed(1)}). ${strongestReading(zScoresOf(effectiveCounts, nEff))}`);
+     return {
+         id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
+         reason: zReason(d, `Digit ${d.digit} has ${(100 * weights[d.digit] / sumW).toFixed(1)}% of exponentially weighted share (half-life 50 ticks)`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
+@@ -165,7 +178,7 @@ export function momentumStrategy(digits: readonly number[]): StrategyResult {
+         return se > 0 ? (p1 - p2) / se : 0;
+     });
+     const d = decideFromZ(zs, { zMatch: THRESHOLDS.zMatch, zDiff: THRESHOLDS.momentumZDiff });
+-    if (!d) return noSignal(id, name, 'No digit share shift crossed the conservative two-window threshold.');
++    if (!d) return noSignal(id, name, `No digit share shift crossed the conservative two-window threshold. ${strongestReading(zs)}`);
+     return {
+         id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
+         reason: zReason(d, `Digit ${d.digit}: ${(100 * recentC[d.digit] / 50).toFixed(1)}% in last 50 ticks vs ${(100 * priorC[d.digit] / 100).toFixed(1)}% in prior 100`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.momentumZDiff)),
+@@ -201,7 +214,7 @@ export function transitionsStrategy(digits: readonly number[]): StrategyResult {
+     for (let i = 0; i < digits.length - 1; i++) if (digits[i] === current) successors.push(digits[i + 1]);
+     if (successors.length < THRESHOLDS.transitionsMinSuccessors) return noSignal(id, name, `Only ${successors.length} historical successors for digit ${current}; ${THRESHOLDS.transitionsMinSuccessors} required.`, 'ineligible');
+     const counts = countsOf(successors), d = decideFromZ(counts, successors.length);
+-    if (!d) return noSignal(id, name, `Successor distribution after digit ${current} did not cross threshold.`);
++    if (!d) return noSignal(id, name, `Successor distribution after digit ${current} did not cross threshold. ${strongestReading(zScoresOf(counts, successors.length))}`);
+     return {
+         id, name, status: 'signal', signal: d.direction, direction: d.direction, digit: d.digit, strength: d.strength,
+         reason: zReason(d, `Digit ${d.digit} followed current digit ${current} ${counts[d.digit]}/${successors.length} times`, d.direction === 'MATCHES' ? THRESHOLDS.zMatch : Math.abs(THRESHOLDS.zDiff)),
