@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { CONTRACTS, barrierError } from '../contracts';
 import type { TradeKind } from '../contracts';
 import {
+    DEFAULT_PATTERN_STRATEGY_IDS,
     PATTERN_STRATEGY_IDS,
     PATTERN_STRATEGY_INFO,
     analyzePattern,
@@ -16,9 +17,12 @@ const uniform = (n: number, seed: number) => {
 const KINDS: TradeKind[] = ['matches_differs', 'even_odd', 'over_under'];
 
 describe('pattern strategy registry', () => {
-    it('exposes the eight strategies with unique ids', () => {
-        expect(PATTERN_STRATEGY_INFO).toHaveLength(8);
-        expect(new Set(PATTERN_STRATEGY_IDS).size).toBe(8);
+    it('exposes ten strategies with unique ids; the two experimental ones are not on by default', () => {
+        expect(PATTERN_STRATEGY_INFO).toHaveLength(10);
+        expect(new Set(PATTERN_STRATEGY_IDS).size).toBe(10);
+        expect(DEFAULT_PATTERN_STRATEGY_IDS).toHaveLength(8);
+        expect(DEFAULT_PATTERN_STRATEGY_IDS).not.toContain('rising_share');
+        expect(DEFAULT_PATTERN_STRATEGY_IDS).not.toContain('hot_fade');
     });
 
     it('throws on an unknown strategy id', () => {
@@ -96,6 +100,75 @@ describe('individual strategies', () => {
         const digits = uniform(1000, 21);
         expect(['abstain', 'signal']).toContain(runPatternStrategy('skew', digits, 'matches_differs').status);
         expect(runPatternStrategy('transition', uniform(150, 2), 'matches_differs').status).toBe('ineligible');
+    });
+});
+
+describe('share-trend strategies (Matches/Differs only)', () => {
+    const OTHERS = [0, 1, 2, 3, 4, 5, 7, 8, 9]; // every digit except 6
+    const cycleOthers = (n: number) => Array.from({ length: n }, (_, i) => OTHERS[i % OTHERS.length]);
+
+    // 350 ticks. The shared middle 250 ticks hold 27 sixes (9.0% of 300 once the 50 oldest ticks, which
+    // have none, are counted); the newest 50 ticks add 5 more sixes, so six moves 9.0% -> 10.7% (+1.7 points).
+    const risingSix = () => {
+        const middle = cycleOthers(250);
+        for (let i = 0; i < 27; i++) middle[i * 9] = 6;
+        const newest = cycleOthers(50);
+        for (let i = 0; i < 5; i++) newest[i * 10] = 6;
+        return [...cycleOthers(50), ...middle, ...newest];
+    };
+
+    it('Rising Share signals MATCHES on the digit that gained share while still under 11%', () => {
+        const result = runPatternStrategy('rising_share', risingSix(), 'matches_differs');
+        expect(result.status).toBe('signal');
+        expect(result.direction).toBe('MATCHES');
+        expect(result.digit).toBe(6);
+        expect(result.reason).toContain('past ticks only');
+        expect(result.reason).toContain('9.0%');
+        expect(result.reason).toContain('10.7%');
+    });
+
+    it('Rising Share abstains with an explanation when nothing gained a point', () => {
+        const flat = Array.from({ length: 400 }, (_, i) => i % 10); // perfectly even
+        const result = runPatternStrategy('rising_share', flat, 'matches_differs');
+        expect(result.status).toBe('abstain');
+        expect(result.reason).toContain('Not a signal');
+    });
+
+    it('Rising Share ignores a digit that already sits at 11% or more', () => {
+        // Same shape but six ends at ~13%: it is "high", not "rising".
+        const digits = risingSix();
+        for (let i = 300; i < 350; i += 2) digits[i] = 6;
+        const result = runPatternStrategy('rising_share', digits, 'matches_differs');
+        expect(result.digit === 6 && result.status === 'signal').toBe(false);
+    });
+
+    it('Hot Digit Fade signals DIFFERS on a digit holding 11%+ of the last 300 ticks', () => {
+        const others = [0, 1, 2, 4, 5, 6, 7, 8, 9];
+        let k = 0;
+        const hot = Array.from({ length: 350 }, (_, i) => (i % 7 === 0 ? 3 : others[k++ % others.length]));
+        const result = runPatternStrategy('hot_fade', hot, 'matches_differs');
+        expect(result.status).toBe('signal');
+        expect(result.direction).toBe('DIFFERS');
+        expect(result.digit).toBe(3);
+        expect(result.reason).toContain('90%');
+    });
+
+    it('Hot Digit Fade abstains when no digit reaches 11%', () => {
+        const flat = Array.from({ length: 400 }, (_, i) => i % 10);
+        expect(runPatternStrategy('hot_fade', flat, 'matches_differs').status).toBe('abstain');
+    });
+
+    it('both are ineligible, not signalling, for Even/Odd and Over/Under and on short data', () => {
+        for (const id of ['rising_share', 'hot_fade']) {
+            expect(runPatternStrategy(id, uniform(500, 2), 'even_odd').status).toBe('ineligible');
+            expect(runPatternStrategy(id, uniform(500, 2), 'over_under').status).toBe('ineligible');
+            expect(runPatternStrategy(id, uniform(100, 2), 'matches_differs').status).toBe('ineligible');
+        }
+    });
+
+    it('selecting them explicitly makes analyzePattern run them', () => {
+        const result = analyzePattern(uniform(500, 12), 'matches_differs', { strategyIds: ['rising_share', 'hot_fade'] });
+        expect(result.strategies.map(s => s.id)).toEqual(['rising_share', 'hot_fade']);
     });
 });
 
