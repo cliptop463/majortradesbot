@@ -9,7 +9,15 @@ import { rankMarkets } from '@/utils/digit-scanner/ensemble';
 import type { Direction, MarketAnalysis, RankingResult, RankedMarket, StrategyResult } from '@/utils/digit-scanner/types';
 import { CONTRACTS, TRADE_KINDS, TRADE_KIND_LABELS, formatPick } from '@/utils/digit-scanner/contracts';
 import type { TradeKind } from '@/utils/digit-scanner/contracts';
-import { PATTERN_STRATEGY_IDS, PATTERN_STRATEGY_INFO, analyzePattern } from '@/utils/digit-scanner/pattern-strategies';
+import {
+    DEFAULT_PATTERN_STRATEGY_IDS,
+    PATTERN_STRATEGY_IDS,
+    PATTERN_STRATEGY_INFO,
+    analyzePattern,
+} from '@/utils/digit-scanner/pattern-strategies';
+import { backtestDigits } from '@/utils/digit-scanner/backtest';
+import { mergeStudies, shareTrendStudy, studyVerdict, zForRate } from '@/utils/digit-scanner/share-trend';
+import type { ShareTrendStudy } from '@/utils/digit-scanner/share-trend';
 import { previewScannerPick, applyScannerPick } from '@/utils/blockly-scanner-pick';
 import type { ScannerPickPreview } from '@/utils/blockly-scanner-pick';
 import './digit-scanner-modal.scss';
@@ -36,7 +44,18 @@ const directionLabel = (d: string) => CONTRACTS[d as Direction]?.label ?? d;
 const DEFAULT_MIN_TICKS = 200;
 const MIN_TICKS_FLOOR = 50;
 const MAX_TICKS = 5000;
-const DEFAULT_FETCH_COUNT = 500;
+const DEFAULT_FETCH_COUNT = 1000;
+const MIN_VALIDATION_TICKS = 600;
+
+type Validation = {
+    markets: number;
+    windows: number;
+    signals: number;
+    hits: number;
+    expectedHits: number;
+    variance: number;
+    study: ShareTrendStudy;
+};
 
 const StatusBadge: React.FC<{ status: MarketAnalysis['status'] | 'skipped' }> = ({ status }) => {
     const labels: Record<string, string> = {
@@ -297,7 +316,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
     const [min_ticks_input, setMinTicksInput] = React.useState(String(DEFAULT_MIN_TICKS));
     const [trade_kind, setTradeKind] = React.useState<TradeKind>('matches_differs');
     const [engine, setEngine] = React.useState<Engine>('statistical');
-    const [selected_strategies, setSelectedStrategies] = React.useState<string[]>([...PATTERN_STRATEGY_IDS]);
+    const [selected_strategies, setSelectedStrategies] = React.useState<string[]>([...DEFAULT_PATTERN_STRATEGY_IDS]);
     const [min_agree_input, setMinAgreeInput] = React.useState('1');
 
     // Even/Odd and Over/Under only have the pattern strategies.
@@ -306,7 +325,19 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
     const is_min_agree_valid =
         Number.isInteger(parsed_min_agree) && parsed_min_agree >= 1 && parsed_min_agree <= Math.max(1, selected_strategies.length);
 
+    const scanned_digits = React.useRef<Map<string, readonly number[]>>(new Map());
+    const [validation, setValidation] = React.useState<Validation | null>(null);
+    const [is_validating, setIsValidating] = React.useState(false);
+
+    const buildAnalyzer = () =>
+        active_engine === 'pattern'
+            ? (digits: readonly number[]) =>
+                  analyzePattern(digits, trade_kind, { strategyIds: selected_strategies, minAgree: parsed_min_agree })
+            : undefined;
+
     const resetResults = () => {
+        setValidation(null);
+        scanned_digits.current = new Map();
         setScanStatus('idle');
         setErrorMsg('');
         setRanking(null);
@@ -334,6 +365,40 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
         if (scan_status === 'scanning') return;
         setSelectedStrategies(all ? [...PATTERN_STRATEGY_IDS] : []);
         resetResults();
+    };
+    const setDefaultStrategies = () => {
+        if (scan_status === 'scanning') return;
+        setSelectedStrategies([...DEFAULT_PATTERN_STRATEGY_IDS]);
+        resetResults();
+    };
+
+    const handleValidate = async () => {
+        if (is_validating || scanned_digits.current.size === 0) return;
+        setIsValidating(true);
+        await new Promise(resolve => setTimeout(resolve, 0)); // let the button state paint first
+        try {
+            const analyze = buildAnalyzer();
+            const studies: ShareTrendStudy[] = [];
+            const totals = { markets: 0, windows: 0, signals: 0, hits: 0, expectedHits: 0, variance: 0 };
+            scanned_digits.current.forEach(digits => {
+                if (digits.length < MIN_VALIDATION_TICKS) return;
+                const result = backtestDigits(digits, {
+                    window: Math.min(500, Math.floor(digits.length / 2)),
+                    step: 25,
+                    analyze,
+                });
+                totals.markets += 1;
+                totals.windows += result.windows;
+                totals.signals += result.signals;
+                totals.hits += result.hits;
+                totals.expectedHits += result.expectedHits;
+                totals.variance += result.variance;
+                studies.push(shareTrendStudy(digits, { horizon: 10 }));
+            });
+            setValidation({ ...totals, study: mergeStudies(studies) });
+        } finally {
+            setIsValidating(false);
+        }
     };
 
     const parsed_min_ticks = Number.parseInt(min_ticks_input, 10);
@@ -368,6 +433,8 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                 return;
             }
         }
+        scanned_digits.current = new Map();
+        setValidation(null);
         setScanStatus('scanning');
         setErrorMsg('');
         setRanking(null);
@@ -405,15 +472,10 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                 minObservations: parsed_min_ticks,
                 concurrency: 3,
                 timeout: 10000,
-                ...(active_engine === 'pattern'
-                    ? {
-                          analyze: (digits: readonly number[]) =>
-                              analyzePattern(digits, trade_kind, {
-                                  strategyIds: selected_strategies,
-                                  minAgree: parsed_min_agree,
-                              }),
-                      }
-                    : {}),
+                onDigits: (symbol: string, digits: readonly number[]) => {
+                    scanned_digits.current.set(symbol, digits);
+                },
+                ...(active_engine === 'pattern' ? { analyze: buildAnalyzer() } : {}),
             });
 
             setRanking(rankMarkets(analyses));
@@ -562,6 +624,14 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                         <button
                                             type='button'
                                             className='digit-scanner-modal__link-button'
+                                            data-testid='dt_digit_scanner_strategies_default'
+                                            onClick={setDefaultStrategies}
+                                        >
+                                            {localize('Default')}
+                                        </button>
+                                        <button
+                                            type='button'
+                                            className='digit-scanner-modal__link-button'
                                             data-testid='dt_digit_scanner_strategies_none'
                                             onClick={() => setAllStrategies(false)}
                                         >
@@ -586,6 +656,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                                 onClick={() => toggleStrategy(info.id)}
                                             >
                                                 {info.name}
+                                                {info.experimental ? ` · ${localize('experimental')}` : ''}
                                             </button>
                                         );
                                     })}
@@ -742,6 +813,64 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                 </>
                             )}
                         </div>
+                    )}
+                    {ranking && scanned_digits.current.size > 0 && (
+                        <section className='digit-scanner-modal__validation' data-testid='dt_digit_scanner_validation'>
+                            <button
+                                type='button'
+                                className='digit-scanner-modal__row-select'
+                                data-testid='dt_digit_scanner_validate'
+                                disabled={is_validating}
+                                onClick={handleValidate}
+                            >
+                                {is_validating ? localize('Validating…') : localize('Validate on these ticks')}
+                            </button>
+                            {validation && validation.signals === 0 && validation.markets > 0 && (
+                                <p className='digit-scanner-modal__hint' data-testid='dt_digit_scanner_validation_strategy'>
+                                    {localize('Your strategy selection produced no signals in {{windows}} test windows, so there is nothing to score.', {
+                                        windows: validation.windows,
+                                    })}
+                                </p>
+                            )}
+                            {validation && validation.signals > 0 && (
+                                <p className='digit-scanner-modal__hint' data-testid='dt_digit_scanner_validation_strategy'>
+                                    {(() => {
+                                        const z = validation.variance > 0 ? (validation.hits - validation.expectedHits) / Math.sqrt(validation.variance) : 0;
+                                        const verdict =
+                                            z >= 2
+                                                ? localize('Above chance in this sample. Re-test on fresh ticks before relying on it.')
+                                                : z <= -2
+                                                  ? localize('Below chance in this sample.')
+                                                  : localize('No evidence these picks beat chance.');
+                                        return `${localize('Your picks')}: ${validation.signals} ${localize('signals')} / ${validation.windows} ${localize('windows')} (${validation.markets} ${localize('markets')}). ${localize('Hit rate')} ${((100 * validation.hits) / validation.signals).toFixed(1)}% ${localize('vs')} ${((100 * validation.expectedHits) / validation.signals).toFixed(1)}% ${localize('expected by chance')} (z=${z.toFixed(1)}). ${verdict}`;
+                                    })()}
+                                </p>
+                            )}
+                            {validation && validation.markets === 0 && (
+                                <p className='digit-scanner-modal__hint'>
+                                    {localize('Need at least {{n}} ticks per market to validate.', { n: MIN_VALIDATION_TICKS })}
+                                </p>
+                            )}
+                            {validation && validation.markets > 0 && (
+                                <p className='digit-scanner-modal__hint' data-testid='dt_digit_scanner_validation_claim'>
+                                    {(() => {
+                                        const { study } = validation;
+                                        if (studyVerdict(study) === 'insufficient_data') {
+                                            return localize('Not enough rising-share events to test that idea yet. Scan again with more ticks.');
+                                        }
+                                        const rate = (a: number, n: number) => (n ? ((100 * a) / n).toFixed(1) : '–');
+                                        const z = zForRate(study.rising.appeared, study.rising.n, study.baselineAppear);
+                                        const verdict =
+                                            z >= 2
+                                                ? localize('Rising digits appeared more than chance in this sample. Re-test on fresh ticks.')
+                                                : z <= -2
+                                                  ? localize('Rising digits appeared less than chance in this sample.')
+                                                  : localize('No evidence that rising digits come sooner than others.');
+                                        return `${localize('Rising-share idea')}: ${localize('digits with a rising share')} (n=${study.rising.n}) ${localize('showed up in the next')} ${study.horizon} ${localize('ticks')} ${rate(study.rising.appeared, study.rising.n)}% ${localize('of the time')}; ${localize('digits already at 11%+')} (n=${study.high.n}) ${rate(study.high.appeared, study.high.n)}%; ${localize('chance')} ${(study.baselineAppear * 100).toFixed(1)}%. ${localize('Landing exactly on tick')} ${study.horizon} (${localize('what a Matches contract pays on')}): ${rate(study.rising.exact, study.rising.n)}% ${localize('vs')} ${(study.baselineExact * 100).toFixed(0)}% ${localize('chance')}. ${verdict}`;
+                                    })()}
+                                </p>
+                            )}
+                        </section>
                     )}
                     <p className='digit-scanner-modal__disclaimer'>
                         {localize('Heuristics describe past noise only; they do not imply an edge or guarantee profit.')}
