@@ -34,6 +34,8 @@ export interface ScanMarketsOptions {
      * Even/Odd or Over/Under. Data-quality checks (precision, minimum ticks) still run first.
      */
     analyze?: (digits: readonly number[]) => EnsembleResult;
+    /** Called with each market's valid digits once they pass the data-quality checks (used for validation). */
+    onDigits?: (symbol: string, digits: readonly number[]) => void;
 }
 
 export async function fetchHistory(
@@ -233,6 +235,8 @@ export async function scanMarkets(
                 recommendation: null,
             };
         }
+
+        options?.onDigits?.(symbol, digits);
 
         const ensemble = options?.analyze
             ? options.analyze(digits)

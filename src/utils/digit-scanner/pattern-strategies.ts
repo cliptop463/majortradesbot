@@ -1,5 +1,6 @@
 import { CONTRACTS } from './contracts';
 import type { TradeKind } from './contracts';
+import { classifyTrends, digitShareTrends, SHARE_TREND_DEFAULTS } from './share-trend';
 import type { Direction, EnsembleResult, Recommendation, StrategyResult } from './types';
 
 /**
@@ -18,6 +19,8 @@ export interface PatternStrategyInfo {
     summary: string;
     /** Honest caveat shown to the user. */
     caution?: string;
+    /** Experimental strategies are available to select but are not on by default. */
+    experimental?: boolean;
 }
 
 export const PATTERN_STRATEGY_INFO: readonly PatternStrategyInfo[] = [
@@ -29,9 +32,27 @@ export const PATTERN_STRATEGY_INFO: readonly PatternStrategyInfo[] = [
     { id: 'recency', name: 'Recency Shift', summary: 'Exponentially weighted share that favours the newest ticks.' },
     { id: 'balance_reversion', name: 'Balance Reversion', summary: 'Bets a side or digit that ran short will catch up.', caution: 'Assumes a correction is owed (gambler\'s fallacy).' },
     { id: 'cycle', name: 'Cycle & Alternation', summary: 'Detects a short repeating cycle and projects the next slot.' },
+    {
+        id: 'rising_share',
+        name: 'Rising Share',
+        summary: 'Matches on a digit whose share of recent ticks is rising but is still below 11%. Matches/Differs only.',
+        caution: 'Experimental. On fair digits a rising share does not make a digit more likely: use Validate to test it on your ticks.',
+        experimental: true,
+    },
+    {
+        id: 'hot_fade',
+        name: 'Hot Digit Fade',
+        summary: 'Differs on the digit holding 11% or more of recent ticks. Matches/Differs only.',
+        caution: 'Experimental. Differs wins about 90% of the time on any digit, so a win here does not show the idea works.',
+        experimental: true,
+    },
 ];
 
+/** Every strategy that can be selected. */
 export const PATTERN_STRATEGY_IDS: readonly string[] = PATTERN_STRATEGY_INFO.map(s => s.id);
+
+/** Strategies on by default (experimental ones are opt-in). */
+export const DEFAULT_PATTERN_STRATEGY_IDS: readonly string[] = PATTERN_STRATEGY_INFO.filter(s => !s.experimental).map(s => s.id);
 
 // ───────────────────────── helpers ─────────────────────────
 
@@ -417,6 +438,39 @@ const cycle: RawStrategy = (digits, kind) => {
         : abstain('Digits show no repeating cycle.');
 };
 
+const risingShare: RawStrategy = (digits, kind) => {
+    if (kind !== 'matches_differs') return needs('Digit-level strategy: used for Matches/Differs only.');
+    const trends = digitShareTrends(digits);
+    if (!trends) return needs(`Needs ${SHARE_TREND_DEFAULTS.window + SHARE_TREND_DEFAULTS.shift}+ ticks.`);
+    const { rising } = classifyTrends(trends);
+    if (rising.length === 0) {
+        const best = [...trends].sort((a, b) => b.growth - a.growth || a.digit - b.digit)[0];
+        return abstain(`No digit gained 1.0+ points while staying under 11%. Largest gain: digit ${best.digit} ${(best.growth * 100).toFixed(1)} points. Not a signal.`);
+    }
+    const top = rising[0];
+    return signal(
+        'MATCHES',
+        top.digit,
+        clamp(Math.round(52 + 800 * top.growth), 52, 75),
+        `Digit ${top.digit} share rose from ${(top.prev * 100).toFixed(1)}% to ${(top.now * 100).toFixed(1)}% over the last ${SHARE_TREND_DEFAULTS.shift} ticks and is still under 11%. This describes past ticks only.`
+    );
+};
+
+const hotFade: RawStrategy = (digits, kind) => {
+    if (kind !== 'matches_differs') return needs('Digit-level strategy: used for Matches/Differs only.');
+    const trends = digitShareTrends(digits);
+    if (!trends) return needs(`Needs ${SHARE_TREND_DEFAULTS.window + SHARE_TREND_DEFAULTS.shift}+ ticks.`);
+    const { high } = classifyTrends(trends);
+    if (high.length === 0) return abstain('No digit holds 11% or more of the recent ticks.');
+    const top = high[0];
+    return signal(
+        'DIFFERS',
+        top.digit,
+        clamp(Math.round(52 + 500 * (top.now - 0.11)), 52, 70),
+        `Digit ${top.digit} holds ${(top.now * 100).toFixed(1)}% of the last ${SHARE_TREND_DEFAULTS.window} ticks (fair share is 10%); betting against it. Differs wins about 90% of the time on any digit.`
+    );
+};
+
 const RAW_STRATEGIES: Record<string, RawStrategy> = {
     hot_cold: hotCold_,
     streak_reversal: streakReversal,
@@ -426,6 +480,8 @@ const RAW_STRATEGIES: Record<string, RawStrategy> = {
     recency,
     balance_reversion: balanceReversion,
     cycle,
+    rising_share: risingShare,
+    hot_fade: hotFade,
 };
 
 // ───────────────────────── public API ─────────────────────────
@@ -451,7 +507,7 @@ export function runPatternStrategy(id: string, digits: readonly number[], kind: 
 }
 
 export interface AnalyzePatternOptions {
-    /** Strategy ids to run. Default: all eight. An empty list is rejected. */
+    /** Strategy ids to run. Default: the eight standard strategies. An empty list is rejected. */
     strategyIds?: readonly string[];
     /** Minimum strategies that must agree on the same pick (default 1). */
     minAgree?: number;
@@ -475,7 +531,7 @@ export function analyzePattern(
     kind: TradeKind,
     options?: AnalyzePatternOptions
 ): EnsembleResult {
-    const ids = options?.strategyIds ?? PATTERN_STRATEGY_IDS;
+    const ids = options?.strategyIds ?? DEFAULT_PATTERN_STRATEGY_IDS;
     const minAgree = Math.max(1, Math.floor(options?.minAgree ?? 1));
 
     if (ids.length === 0) {

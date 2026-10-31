@@ -29,6 +29,10 @@ export interface BacktestResult {
     baselineHitRate: number | null;
     /** (hits - expected) / standard deviation. Overlapping windows are correlated, so treat as indicative only. */
     zScore: number | null;
+    /** Raw totals so results from several markets can be pooled. */
+    hits: number;
+    expectedHits: number;
+    variance: number;
     verdict: 'insufficient_data' | 'no_signals' | 'no_evidence_of_edge' | 'above_baseline' | 'below_baseline';
 }
 
@@ -50,6 +54,9 @@ export function backtestDigits(digits: readonly number[], options?: BacktestOpti
         hitRate: null,
         baselineHitRate: null,
         zScore: null,
+        hits: 0,
+        expectedHits: 0,
+        variance: 0,
         verdict: 'insufficient_data',
     };
     if (digits.length <= window) return empty;
@@ -96,6 +103,9 @@ export function backtestDigits(digits: readonly number[], options?: BacktestOpti
         hitRate: hits / signals,
         baselineHitRate: expected / signals,
         zScore,
+        hits,
+        expectedHits: expected,
+        variance,
         verdict,
     };
 }
