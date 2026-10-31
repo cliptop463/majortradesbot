@@ -120,6 +120,161 @@ describe('DigitScannerModal', () => {
         (ApiHelpers.instance.active_symbols as any).has_initialization_error = false;
     });
 
+    const okPreview = {
+        ok: true,
+        symbol: { before: 'R_10', after: 'R_100' },
+        category: { before: 'digits', after: 'digits' },
+        tradeType: { before: 'matchesdiffers', after: 'matchesdiffers' },
+        type: { before: 'DIGITMATCH', after: 'DIGITMATCH' },
+        prediction: { before: 3, after: 5 },
+    };
+
+    const twoMarkets = () => {
+        (selectVolatilityMarkets as jest.Mock).mockReturnValue({
+            markets: [
+                { symbol: 'R_50', underlying_symbol: 'R_50', display_name: 'Volatility 50 Index' },
+                { symbol: 'R_100', underlying_symbol: 'R_100', display_name: 'Volatility 100 Index' },
+            ],
+            skipped: [{ symbol: 'R_25', displayName: 'Volatility 25 Index', reason: 'Market closed' }],
+        });
+    };
+
+    describe('scan modes', () => {
+        it('starts in Auto mode with no market picker', () => {
+            setupScanMocks();
+            render(<DigitScannerModal {...defaultProps} />);
+            expect(screen.getByTestId('dt_digit_scanner_mode_auto').getAttribute('aria-pressed')).toBe('true');
+            expect(screen.queryByTestId('dt_digit_scanner_market_select')).toBeNull();
+        });
+
+        it('Auto: "Use best market" opens the confirm preview for the top-ranked market and applies nothing', async () => {
+            setupScanMocks();
+            (previewScannerPick as jest.Mock).mockReturnValue(okPreview);
+            render(<DigitScannerModal {...defaultProps} />);
+            await act(async () => {
+                fireEvent.click(screen.getByTestId('dialog-confirm'));
+            });
+            fireEvent.click(await screen.findByTestId('dt_digit_scanner_use_best'));
+
+            expect(previewScannerPick).toHaveBeenCalledWith(expect.anything(), {
+                symbol: 'R_100',
+                direction: 'MATCHES',
+                digit: 5,
+            });
+            expect(await screen.findByTestId('dt_digit_scanner_confirm_dialog')).toBeTruthy();
+            expect(applyScannerPick).not.toHaveBeenCalled();
+        });
+
+        it('Manual: lists open markets, disables closed ones, and scans only the chosen index with more ticks', async () => {
+            setupScanMocks();
+            twoMarkets();
+            render(<DigitScannerModal {...defaultProps} />);
+            fireEvent.click(screen.getByTestId('dt_digit_scanner_mode_manual'));
+
+            const select = (await screen.findByTestId('dt_digit_scanner_market_select')) as HTMLSelectElement;
+            const options = Array.from(select.options);
+            expect(options.map(o => o.value)).toEqual(['R_50', 'R_100', 'R_25']);
+            expect(options[2].disabled).toBe(true);
+            expect(options[2].textContent).toContain('Market closed');
+            expect(select.value).toBe('R_50'); // first open market is preselected
+
+            fireEvent.change(select, { target: { value: 'R_100' } });
+            await act(async () => {
+                fireEvent.click(screen.getByTestId('dialog-confirm'));
+            });
+
+            await waitFor(() => expect(scanMarkets).toHaveBeenCalled());
+            const [markets, , options2] = (scanMarkets as jest.Mock).mock.calls[0];
+            expect(markets).toHaveLength(1);
+            expect(markets[0].symbol).toBe('R_100');
+            expect(options2.count).toBeGreaterThanOrEqual(3000);
+        });
+
+        it('Manual: shows the pick and every strategy reading, and Select opens the preview', async () => {
+            setupScanMocks();
+            twoMarkets();
+            (previewScannerPick as jest.Mock).mockReturnValue(okPreview);
+            render(<DigitScannerModal {...defaultProps} />);
+            fireEvent.click(screen.getByTestId('dt_digit_scanner_mode_manual'));
+            await screen.findByTestId('dt_digit_scanner_market_select');
+            await act(async () => {
+                fireEvent.click(screen.getByTestId('dialog-confirm'));
+            });
+
+            const card = await screen.findByTestId('dt_digit_scanner_manual_result');
+            expect(card.textContent).toContain('Volatility 100 Index');
+            expect(screen.getByTestId('dt_digit_scanner_manual_pick').textContent).toContain('Matches 5');
+            expect(card.textContent).toContain('digit 5 appears 12%'); // strategy reasons visible without expanding
+
+            fireEvent.click(screen.getByTestId('dt_digit_scanner_manual_select'));
+            expect(previewScannerPick).toHaveBeenCalled();
+            expect(await screen.findByTestId('dt_digit_scanner_confirm_dialog')).toBeTruthy();
+            expect(applyScannerPick).not.toHaveBeenCalled();
+        });
+
+        it('Manual: with no consensus it says so, still shows each strategy, and offers no Select', async () => {
+            const noSignal = makeAnalysis({
+                status: 'no_consensus',
+                recommendation: null,
+                message: 'No strategy produced a valid signal.',
+                strategies: [
+                    { id: 'hot_cold', name: 'Hot & Cold Frequency', status: 'abstain', signal: 'ABSTAIN', reason: 'Strongest reading: digit 3 z=1.20. Not a signal.' },
+                ],
+            });
+            setupScanMocks([noSignal]);
+            twoMarkets();
+            render(<DigitScannerModal {...defaultProps} />);
+            fireEvent.click(screen.getByTestId('dt_digit_scanner_mode_manual'));
+            await screen.findByTestId('dt_digit_scanner_market_select');
+            await act(async () => {
+                fireEvent.click(screen.getByTestId('dialog-confirm'));
+            });
+
+            expect((await screen.findByTestId('dt_digit_scanner_manual_no_signal')).textContent).toContain('No strategy produced a valid signal.');
+            expect(screen.getByTestId('dt_digit_scanner_manual_result').textContent).toContain('Not a signal');
+            expect(screen.queryByTestId('dt_digit_scanner_manual_select')).toBeNull();
+        });
+
+        it('Manual: reports a chosen index that has since closed instead of scanning something else', async () => {
+            setupScanMocks();
+            twoMarkets();
+            render(<DigitScannerModal {...defaultProps} />);
+            fireEvent.click(screen.getByTestId('dt_digit_scanner_mode_manual'));
+            await screen.findByTestId('dt_digit_scanner_market_select');
+
+            (selectVolatilityMarkets as jest.Mock).mockReturnValue({
+                markets: [{ symbol: 'R_100', underlying_symbol: 'R_100', display_name: 'Volatility 100 Index' }],
+                skipped: [{ symbol: 'R_50', displayName: 'Volatility 50 Index', reason: 'Market closed' }],
+            });
+            await act(async () => {
+                fireEvent.click(screen.getByTestId('dialog-confirm'));
+            });
+            expect((await screen.findByTestId('dt_digit_scanner_error')).textContent).toContain('Market closed');
+            expect(scanMarkets).not.toHaveBeenCalled();
+        });
+
+        it('Manual: shows a connection error with Retry when the market list cannot load', async () => {
+            setupScanMocks();
+            (ApiHelpers.instance.active_symbols as any).has_initialization_error = true;
+            render(<DigitScannerModal {...defaultProps} />);
+            fireEvent.click(screen.getByTestId('dt_digit_scanner_mode_manual'));
+            expect((await screen.findByTestId('dt_digit_scanner_market_error')).textContent).toContain('Connection error');
+            expect(screen.getByTestId('dt_digit_scanner_market_retry')).toBeTruthy();
+        });
+
+        it('switching modes clears stale results', async () => {
+            setupScanMocks();
+            twoMarkets();
+            render(<DigitScannerModal {...defaultProps} />);
+            await act(async () => {
+                fireEvent.click(screen.getByTestId('dialog-confirm'));
+            });
+            await screen.findByTestId('dt_digit_scanner_results');
+            fireEvent.click(screen.getByTestId('dt_digit_scanner_mode_manual'));
+            expect(screen.queryByTestId('dt_digit_scanner_results')).toBeNull();
+        });
+    });
+
     it('defaults to Matches/Differs with the statistical engine and hides the strategy chips', () => {
         setupScanMocks();
         render(<DigitScannerModal {...defaultProps} />);
