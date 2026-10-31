@@ -1,9 +1,13 @@
-export type ScannerPickDirection = 'MATCHES' | 'DIFFERS';
+import { CONTRACTS, barrierError } from './digit-scanner/contracts';
+import type { Direction } from './digit-scanner/types';
+
+export type ScannerPickDirection = Direction;
 
 export type ScannerPickInput = {
     symbol: string;
     direction: ScannerPickDirection;
-    digit: number;
+    /** Prediction digit. Required for Matches/Differs and Over/Under; ignored for Even/Odd. */
+    digit?: number | null;
 };
 
 export type ScannerPickFieldPreview = {
@@ -16,11 +20,12 @@ export type ScannerPickPreview = {
     symbol: ScannerPickFieldPreview;
     /** Trade type category field (TRADETYPECAT_LIST), set to 'digits'. */
     category: ScannerPickFieldPreview;
-    /** Trade type field (TRADETYPE_LIST), set to 'matchesdiffers'. */
+    /** Trade type field (TRADETYPE_LIST): matchesdiffers, evenodd or overunder. */
     tradeType: ScannerPickFieldPreview;
-    /** Matches/Differs contract type field (TYPE_LIST): DIGITMATCH or DIGITDIFF. */
+    /** Contract type field (TYPE_LIST): DIGITMATCH/DIGITDIFF, DIGITEVEN/DIGITODD or DIGITOVER/DIGITUNDER. */
     type: ScannerPickFieldPreview;
-    prediction: ScannerPickFieldPreview;
+    /** Prediction digit. null when the chosen contract has none (Even/Odd): the field is left untouched. */
+    prediction: ScannerPickFieldPreview | null;
 };
 
 export type ScannerPickFailure = {
@@ -152,13 +157,6 @@ const findRequiredBlocks = (workspace: any) => {
 
 const isBotRunning = () => !!window?.run_panel?.is_running;
 
-const normalizeDigit = (digit: number) => {
-    if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
-        throw new RangeError(`Digit must be an integer from 0 to 9, received: ${digit}`);
-    }
-    return digit;
-};
-
 const waitForFieldOption = async (
     block: any,
     fieldName: string,
@@ -225,7 +223,11 @@ const getContractTypeValue = (block: any): string | number | null => {
     return getFieldValue(block, 'TYPE_LIST');
 };
 
-export const ensureMatchesDiffers = async (tradeTypeBlock: any): Promise<ScannerPickFailure | { ok: true }> => {
+export const ensureTradeType = async (
+    tradeTypeBlock: any,
+    tradeType: string,
+    label: string
+): Promise<ScannerPickFailure | { ok: true }> => {
     if (!tradeTypeBlock) {
         return { ok: false, reason: 'Missing trade_definition_tradetype block.' };
     }
@@ -242,18 +244,22 @@ export const ensureMatchesDiffers = async (tradeTypeBlock: any): Promise<Scanner
     }
 
     const tradeTypeBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType);
-    if (String(tradeTypeBefore ?? '').trim() !== 'matchesdiffers') {
-        const tradeTypeReady = await waitForFieldOption(tradeTypeBlock, FIELD_NAMES.tradeType, 'matchesdiffers');
+    if (String(tradeTypeBefore ?? '').trim() !== tradeType) {
+        const tradeTypeReady = await waitForFieldOption(tradeTypeBlock, FIELD_NAMES.tradeType, tradeType);
         if (!tradeTypeReady) {
-            return { ok: false, reason: 'Matches/Differs trade type is unavailable for this symbol.' };
+            return { ok: false, reason: `${label} trade type is unavailable for this symbol.` };
         }
-        setFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType, 'matchesdiffers');
-        fireFieldChange(tradeTypeBlock, FIELD_NAMES.tradeType, tradeTypeBefore, 'matchesdiffers');
+        setFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType, tradeType);
+        fireFieldChange(tradeTypeBlock, FIELD_NAMES.tradeType, tradeTypeBefore, tradeType);
         await sleep(100);
     }
 
     return { ok: true };
 };
+
+/** Kept for existing callers. */
+export const ensureMatchesDiffers = (tradeTypeBlock: any) =>
+    ensureTradeType(tradeTypeBlock, 'matchesdiffers', 'Matches/Differs');
 
 const blocked = (reason: string): ScannerPickFailure => ({ ok: false, blocked: true, reason: `BLOCKED: ${reason}` });
 
@@ -274,7 +280,14 @@ const findMissingField = (marketBlock: any, tradeTypeBlock: any): string | null 
 
 export const previewScannerPick = (workspace: any, pick: ScannerPickInput): ScannerPickResult => {
     try {
-        const validatedDigit = normalizeDigit(pick.digit);
+        const spec = CONTRACTS[pick.direction];
+        if (!spec) {
+            throw new RangeError(`Unsupported direction: ${pick.direction}`);
+        }
+        const digitProblem = barrierError(pick.direction, pick.digit);
+        if (digitProblem) {
+            throw new RangeError(digitProblem);
+        }
         const required = findRequiredBlocks(workspace);
         if (!required.ok) {
             return blocked(required.reason);
@@ -293,18 +306,16 @@ export const previewScannerPick = (workspace: any, pick: ScannerPickInput): Scan
         const categoryBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory);
         const tradeTypeBefore = getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType);
 
-        const targetType = pick.direction === 'MATCHES' ? 'DIGITMATCH' : 'DIGITDIFF';
         const symbolAfter = pick.symbol;
-        const typeAfter = targetType;
-        const predictionAfter = validatedDigit;
+        const typeAfter = spec.typeValue;
 
         return {
             ok: true,
             symbol: { before: symbolBefore, after: symbolAfter },
             category: { before: categoryBefore, after: 'digits' },
-            tradeType: { before: tradeTypeBefore, after: 'matchesdiffers' },
+            tradeType: { before: tradeTypeBefore, after: spec.tradeType },
             type: { before: typeBefore, after: typeAfter },
-            prediction: { before: predictionBefore, after: predictionAfter },
+            prediction: spec.hasBarrier ? { before: predictionBefore, after: pick.digit as number } : null,
         };
     } catch (error) {
         return {
@@ -332,9 +343,10 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
 
         const { marketBlock, contractTypeBlock, predictionBlock, tradeTypeBlock } = required;
 
-        const targetType = pick.direction === 'MATCHES' ? 'DIGITMATCH' : 'DIGITDIFF';
+        const spec = CONTRACTS[pick.direction];
+        const targetType = spec.typeValue;
         const targetSymbol = pick.symbol;
-        const targetDigit = normalizeDigit(pick.digit);
+        const targetDigit = spec.hasBarrier ? (pick.digit as number) : null;
 
         const originalGroup = window?.Blockly?.Events?.getGroup?.() ?? null;
         window.Blockly.Events.setGroup('scanner-pick-apply');
@@ -348,7 +360,7 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
 
             await sleep(500);
 
-            const categoryState = await ensureMatchesDiffers(tradeTypeBlock);
+            const categoryState = await ensureTradeType(tradeTypeBlock, spec.tradeType, spec.label);
             if (!categoryState.ok) {
                 return categoryState;
             }
@@ -361,7 +373,7 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
                 if (!contractTypeReady) {
                     return {
                         ok: false,
-                        reason: `Digits/Matches-Differs contract type is unavailable for symbol ${targetSymbol}.`,
+                        reason: `${spec.label} contract type is unavailable for symbol ${targetSymbol}.`,
                     };
                 }
                 setFieldValue(contractTypeBlock, FIELD_NAMES.type, targetType);
@@ -369,15 +381,18 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
                 await sleep(200);
             }
 
-            const predictionTarget = await waitForPredictionInput(predictionBlock, 3000);
-            if (!predictionTarget) {
-                return { ok: false, reason: 'Prediction input not available for this trade type.' };
-            }
+            let predictionBefore: string | number | null = null;
+            if (spec.hasBarrier && targetDigit !== null) {
+                const predictionTarget = await waitForPredictionInput(predictionBlock, 3000);
+                if (!predictionTarget) {
+                    return { ok: false, reason: 'Prediction input not available for this trade type.' };
+                }
 
-            const predictionBefore = getPredictionValue(predictionBlock);
-            if (predictionBefore !== targetDigit) {
-                setPredictionValue(predictionBlock, targetDigit);
-                fireFieldChange(predictionTarget, 'NUM', predictionBefore, targetDigit);
+                predictionBefore = getPredictionValue(predictionBlock);
+                if (predictionBefore !== targetDigit) {
+                    setPredictionValue(predictionBlock, targetDigit);
+                    fireFieldChange(predictionTarget, 'NUM', predictionBefore, targetDigit);
+                }
             }
 
             workspace?.render?.();
@@ -388,7 +403,7 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
                 category: preview.category,
                 tradeType: preview.tradeType,
                 type: { before: typeBefore, after: targetType },
-                prediction: { before: predictionBefore, after: targetDigit },
+                prediction: targetDigit === null ? null : { before: predictionBefore, after: targetDigit },
             };
         } finally {
             if (window?.Blockly?.Events) {
@@ -415,4 +430,5 @@ export default {
     previewScannerPick,
     applyScannerPick,
     ensureMatchesDiffers,
+    ensureTradeType,
 };
