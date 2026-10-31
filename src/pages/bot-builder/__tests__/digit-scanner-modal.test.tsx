@@ -23,6 +23,7 @@ jest.mock('@/utils/digit-scanner/scan', () => ({
 }));
 
 jest.mock('@/utils/digit-scanner/ensemble', () => ({
+    ...jest.requireActual('@/utils/digit-scanner/ensemble'),
     rankMarkets: jest.fn(),
 }));
 
@@ -119,6 +120,103 @@ describe('DigitScannerModal', () => {
         (ApiHelpers.instance.active_symbols as any).has_initialization_error = false;
     });
 
+    it('defaults to Matches/Differs with the statistical engine and hides the strategy chips', () => {
+        setupScanMocks();
+        render(<DigitScannerModal {...defaultProps} />);
+        expect(screen.getByTestId('dt_digit_scanner_kind_matches_differs').getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByTestId('dt_digit_scanner_engine_statistical').getAttribute('aria-pressed')).toBe('true');
+        expect(screen.queryByTestId('dt_digit_scanner_strategy_hot_cold')).toBeNull();
+    });
+
+    it('lets the user pick Even/Odd and choose which pattern strategies run', async () => {
+        setupScanMocks();
+        render(<DigitScannerModal {...defaultProps} />);
+
+        fireEvent.click(screen.getByTestId('dt_digit_scanner_kind_even_odd'));
+        // Even/Odd has no statistical engine, so strategies are shown straight away, all on.
+        expect(screen.queryByTestId('dt_digit_scanner_engine_statistical')).toBeNull();
+        expect(screen.getByTestId('dt_digit_scanner_strategy_hot_cold').getAttribute('aria-pressed')).toBe('true');
+
+        fireEvent.click(screen.getByTestId('dt_digit_scanner_strategies_none'));
+        fireEvent.click(screen.getByTestId('dt_digit_scanner_strategy_momentum'));
+        fireEvent.click(screen.getByTestId('dt_digit_scanner_strategy_cycle'));
+        expect(screen.getByTestId('dt_digit_scanner_strategy_hot_cold').getAttribute('aria-pressed')).toBe('false');
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+        await waitFor(() => expect(scanMarkets).toHaveBeenCalled());
+        const options = (scanMarkets as jest.Mock).mock.calls[0][2];
+        expect(typeof options.analyze).toBe('function');
+
+        // The analyzer handed to the scanner only runs the two chosen strategies for Even/Odd.
+        const alternating = Array.from({ length: 300 }, (_, i) => (i % 2 === 0 ? 2 : 3));
+        const result = options.analyze(alternating);
+        expect(result.strategies.map((s: { id: string }) => s.id)).toEqual(['momentum', 'cycle']);
+    });
+
+    it('refuses to scan a pattern set with no strategies selected', async () => {
+        setupScanMocks();
+        render(<DigitScannerModal {...defaultProps} />);
+        fireEvent.click(screen.getByTestId('dt_digit_scanner_kind_over_under'));
+        fireEvent.click(screen.getByTestId('dt_digit_scanner_strategies_none'));
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+        expect(await screen.findByTestId('dt_digit_scanner_error')).toBeTruthy();
+        expect(scanMarkets).not.toHaveBeenCalled();
+    });
+
+    const feedTicks = (symbols: string[]) =>
+        (scanMarkets as jest.Mock).mockImplementation(async (_m: unknown, _f: unknown, options: any) => {
+            symbols.forEach((symbol, k) => {
+                let seed = 42 + k * 101;
+                const digits = Array.from({ length: 1000 }, () => (seed = (seed * 1664525 + 1013904223) % 4294967296) % 10);
+                options.onDigits?.(symbol, digits);
+            });
+            return [makeAnalysis()];
+        });
+
+    const scanAndValidate = async () => {
+        render(<DigitScannerModal {...defaultProps} />);
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dialog-confirm'));
+        });
+        await waitFor(() => expect(screen.getByTestId('dt_digit_scanner_validate')).toBeTruthy());
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_digit_scanner_validate'));
+        });
+        await waitFor(() => expect(screen.getByTestId('dt_digit_scanner_validation_claim')).toBeTruthy());
+        return screen.getByTestId('dt_digit_scanner_validation_claim').textContent as string;
+    };
+
+    it('validates the rising-share idea on the ticks the scan just fetched, pooled across markets', async () => {
+        setupScanMocks();
+        feedTicks(['R_10', 'R_25', 'R_50', 'R_75', 'R_100', '1HZ10V', '1HZ25V', '1HZ50V']);
+        const claim = await scanAndValidate();
+        expect(claim).toContain('Rising-share idea');
+        expect(claim).toContain('chance');
+        expect(claim).toContain('Landing exactly on tick 10');
+    });
+
+    it('says plainly when there are too few rising-share events to judge', async () => {
+        setupScanMocks();
+        feedTicks(['R_10']);
+        const claim = await scanAndValidate();
+        expect(claim).toContain('Not enough rising-share events');
+    });
+
+    it('offers the two experimental strategies but leaves them off by default', () => {
+        setupScanMocks();
+        render(<DigitScannerModal {...defaultProps} />);
+        fireEvent.click(screen.getByTestId('dt_digit_scanner_engine_pattern'));
+        expect(screen.getByTestId('dt_digit_scanner_strategy_hot_cold').getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByTestId('dt_digit_scanner_strategy_rising_share').getAttribute('aria-pressed')).toBe('false');
+        expect(screen.getByTestId('dt_digit_scanner_strategy_hot_fade').getAttribute('aria-pressed')).toBe('false');
+        fireEvent.click(screen.getByTestId('dt_digit_scanner_strategy_rising_share'));
+        expect(screen.getByTestId('dt_digit_scanner_strategy_rising_share').getAttribute('aria-pressed')).toBe('true');
+    });
+
     it('passes the configured minimum ticks to the scanner and defaults to 200', async () => {
         setupScanMocks();
         render(<DigitScannerModal {...defaultProps} />);
@@ -171,7 +269,7 @@ describe('DigitScannerModal', () => {
         );
         expect(screen.getByText(/Heuristics describe past noise only/)).toBeTruthy();
         fireEvent.click(screen.getAllByLabelText('Expand strategies')[0]);
-        expect(screen.getByText('Matches 5')).toBeTruthy();
+        expect(screen.getAllByText('Matches 5').length).toBeGreaterThan(1); // ranked row + strategy row
         expect(screen.getByText('digit 5 appears 12%')).toBeTruthy();
     });
 
@@ -199,7 +297,7 @@ describe('DigitScannerModal', () => {
         expect(table?.textContent).toContain('Volatility 200 Index');
         expect(cards?.textContent).toContain('Volatility 100 Index');
         expect(cards?.textContent).toContain('Volatility 200 Index');
-        expect(cards?.textContent).toContain('Differs digit 3');
+        expect(cards?.textContent).toContain('Differs 3');
         expect(container.querySelector('.digit-scanner-modal__content')).toBeTruthy();
         expect(container.querySelector('.digit-scanner-confirm-modal__content')).toBeNull();
     });
