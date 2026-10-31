@@ -53,4 +53,31 @@ describe('previewScannerPick', () => {
         expect(result.blocked).toBe(true);
         expect(result.reason).toContain('SYMBOL_LIST');
     });
+
+    it('previews Even/Odd without touching the prediction digit', () => {
+        const result: any = previewScannerPick(workspaceWith(fullBlocks()), { symbol: 'R_100', direction: 'EVEN' });
+        expect(result.ok).toBe(true);
+        expect(result.category).toEqual({ before: 'callput', after: 'digits' });
+        expect(result.tradeType).toEqual({ before: 'risefall', after: 'evenodd' });
+        expect(result.type).toEqual({ before: 'CALL', after: 'DIGITEVEN' });
+        expect(result.prediction).toBeNull();
+    });
+
+    it('previews Over/Under with its barrier digit', () => {
+        const result: any = previewScannerPick(workspaceWith(fullBlocks()), { symbol: 'R_50', direction: 'UNDER', digit: 6 });
+        expect(result.ok).toBe(true);
+        expect(result.tradeType.after).toBe('overunder');
+        expect(result.type.after).toBe('DIGITUNDER');
+        expect(result.prediction).toEqual({ before: 3, after: 6 });
+    });
+
+    it('rejects barriers that can never win or are missing', () => {
+        const ws = workspaceWith(fullBlocks());
+        const over9: any = previewScannerPick(ws, { symbol: 'R_100', direction: 'OVER', digit: 9 });
+        expect(over9.ok).toBe(false);
+        const under0: any = previewScannerPick(ws, { symbol: 'R_100', direction: 'UNDER', digit: 0 });
+        expect(under0.ok).toBe(false);
+        const missing: any = previewScannerPick(ws, { symbol: 'R_100', direction: 'MATCHES', digit: null });
+        expect(missing.ok).toBe(false);
+    });
 });
