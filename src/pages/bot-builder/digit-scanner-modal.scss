@@ -704,3 +704,32 @@
     padding: 0.8rem;
     border-top: 1px solid var(--border-normal);
 }
+
+.digit-scanner-modal__select {
+    width: 100%;
+    min-height: 3.6rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--border-normal);
+    border-radius: 0.4rem;
+    background: transparent;
+    color: var(--text-prominent);
+    font-size: 1.3rem;
+}
+
+.digit-scanner-modal__manual-picker {
+    margin-top: 0.4rem;
+}
+
+.digit-scanner-modal__manual-result {
+    padding: 0.8rem;
+    border: 1px solid var(--border-normal);
+    border-radius: 0.8rem;
+}
+
+.digit-scanner-modal__manual-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-bottom: 0.6rem;
+}

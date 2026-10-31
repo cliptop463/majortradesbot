@@ -38,6 +38,10 @@ type ConfirmState = {
 } | null;
 
 type Engine = 'statistical' | 'pattern';
+type ScanMode = 'auto' | 'manual';
+type MarketOption = { symbol: string; displayName: string; unavailableReason?: string };
+
+const symbolOf = (m: any): string => m?.underlying_symbol || m?.symbol || '';
 
 const directionLabel = (d: string) => CONTRACTS[d as Direction]?.label ?? d;
 
@@ -45,6 +49,7 @@ const DEFAULT_MIN_TICKS = 200;
 const MIN_TICKS_FLOOR = 50;
 const MAX_TICKS = 5000;
 const DEFAULT_FETCH_COUNT = 1000;
+const MANUAL_FETCH_COUNT = 3000; // one market only, so fetch more ticks to give validation enough events
 const MIN_VALIDATION_TICKS = 600;
 
 type Validation = {
@@ -305,6 +310,65 @@ const SkippedRow: React.FC<{ market: SkippedMarket }> = ({ market }) => (
     </tr>
 );
 
+const ManualResult: React.FC<{
+    analysis: MarketAnalysis;
+    onSelect: (a: MarketAnalysis) => void;
+    isRunning: boolean;
+}> = ({ analysis, onSelect, isRunning }) => {
+    const rec = analysis.recommendation;
+    return (
+        <section className='digit-scanner-modal__manual-result' data-testid='dt_digit_scanner_manual_result'>
+            <header className='digit-scanner-modal__manual-header'>
+                <div>
+                    <strong>{analysis.displayName}</strong>
+                    <span className='digit-scanner-modal__row-symbol'>{analysis.symbol}</span>
+                </div>
+                <StatusBadge status={analysis.status} />
+            </header>
+
+            {rec ? (
+                <>
+                    <p className='digit-scanner-modal__selected' data-testid='dt_digit_scanner_manual_pick'>
+                        {`${formatPick(rec.direction, rec.digit)} · ${rec.agree}/${rec.eligible} ${localize('agree')} · ${localize(
+                            'Heuristic score (not a win probability)'
+                        )} ${rec.heuristicScore.toFixed(1)}`}
+                    </p>
+                    <button
+                        type='button'
+                        className='digit-scanner-modal__select-button'
+                        data-testid='dt_digit_scanner_manual_select'
+                        disabled={isRunning}
+                        onClick={() => onSelect(analysis)}
+                    >
+                        {localize('Select')}
+                    </button>
+                </>
+            ) : (
+                <p className='digit-scanner-modal__message' data-testid='dt_digit_scanner_manual_no_signal'>
+                    {analysis.message || localize('No signal from the selected strategies on these ticks.')}
+                </p>
+            )}
+
+            {analysis.strategies.length > 0 && (
+                <table className='digit-scanner-modal__strategy-table'>
+                    <thead>
+                        <tr className='digit-scanner-modal__strategy-table-head'>
+                            <th>{localize('Strategy')}</th>
+                            <th>{localize('Signal')}</th>
+                            <th>{localize('Reason')}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {analysis.strategies.map(st => (
+                            <StrategyRow key={st.id} s={st} />
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </section>
+    );
+};
+
 const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_running }) => {
     const [scan_status, setScanStatus] = React.useState<ScanStatus>('idle');
     const [error_msg, setErrorMsg] = React.useState('');
@@ -318,6 +382,19 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
     const [engine, setEngine] = React.useState<Engine>('statistical');
     const [selected_strategies, setSelectedStrategies] = React.useState<string[]>([...DEFAULT_PATTERN_STRATEGY_IDS]);
     const [min_agree_input, setMinAgreeInput] = React.useState('1');
+    const [scan_mode, setScanMode] = React.useState<ScanMode>('auto');
+    const [market_options, setMarketOptions] = React.useState<MarketOption[]>([]);
+    const [market_options_status, setMarketOptionsStatus] = React.useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+    const [market_options_error, setMarketOptionsError] = React.useState('');
+    const [manual_symbol, setManualSymbol] = React.useState('');
+    const is_manual = scan_mode === 'manual';
+    const is_mounted = React.useRef(true);
+    React.useEffect(() => {
+        is_mounted.current = true;
+        return () => {
+            is_mounted.current = false;
+        };
+    }, []);
 
     // Even/Odd and Over/Under only have the pattern strategies.
     const active_engine: Engine = trade_kind === 'matches_differs' ? engine : 'pattern';
@@ -405,6 +482,58 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
     const is_min_ticks_valid =
         Number.isInteger(parsed_min_ticks) && parsed_min_ticks >= MIN_TICKS_FLOOR && parsed_min_ticks <= MAX_TICKS;
 
+    /** Loads the open volatility markets (and the closed ones, for display) from the existing connection. */
+    const loadVolatilityMarkets = async () => {
+        const apiSymbols = ApiHelpers?.instance?.active_symbols;
+        if (!apiSymbols || typeof apiSymbols.retrieveActiveSymbols !== 'function') {
+            throw new Error(localize('Connection error: active symbols are unavailable.'));
+        }
+        const rawSymbols = await apiSymbols.retrieveActiveSymbols(false);
+        if (apiSymbols.has_initialization_error) {
+            throw new Error(localize('Connection error: unable to load active symbols. Check your connection.'));
+        }
+        if (!Array.isArray(rawSymbols)) {
+            throw new Error(localize('Connection error: active symbols response was invalid.'));
+        }
+        return selectVolatilityMarkets(rawSymbols);
+    };
+
+    const loadMarketOptions = async () => {
+        setMarketOptionsStatus('loading');
+        setMarketOptionsError('');
+        try {
+            const { markets, skipped } = await loadVolatilityMarkets();
+            if (!is_mounted.current) return;
+            const options: MarketOption[] = [
+                ...markets.map((m: any) => ({
+                    symbol: symbolOf(m),
+                    displayName: m.underlying_symbol_name || m.display_name || symbolOf(m),
+                })),
+                ...skipped.map(k => ({ symbol: k.symbol, displayName: k.displayName, unavailableReason: k.reason })),
+            ];
+            setMarketOptions(options);
+            setManualSymbol(current => current || options.find(o => !o.unavailableReason)?.symbol || '');
+            setMarketOptionsStatus('ready');
+        } catch (e) {
+            if (!is_mounted.current) return;
+            setMarketOptionsError(e instanceof Error ? e.message : String(e));
+            setMarketOptionsStatus('error');
+        }
+    };
+
+    React.useEffect(() => {
+        if (isOpen && is_manual && market_options_status === 'idle') {
+            loadMarketOptions();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, is_manual, market_options_status]);
+
+    const chooseMode = (mode: ScanMode) => {
+        if (scan_status === 'scanning' || mode === scan_mode) return;
+        setScanMode(mode);
+        resetResults();
+    };
+
     const handleScan = async () => {
         if (scan_status === 'scanning') return;
         if (!is_min_ticks_valid) {
@@ -433,6 +562,11 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                 return;
             }
         }
+        if (is_manual && !manual_symbol) {
+            setErrorMsg(localize('Choose a volatility index to scan.'));
+            setScanStatus('error');
+            return;
+        }
         scanned_digits.current = new Map();
         setValidation(null);
         setScanStatus('scanning');
@@ -442,21 +576,23 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
         setApplyError('');
 
         try {
-            const apiSymbols = ApiHelpers?.instance?.active_symbols;
-            if (!apiSymbols || typeof apiSymbols.retrieveActiveSymbols !== 'function') {
-                throw new Error(localize('Connection error: active symbols are unavailable.'));
-            }
-            const rawSymbols = await apiSymbols.retrieveActiveSymbols(false);
-            if (apiSymbols.has_initialization_error) {
-                throw new Error(localize('Connection error: unable to load active symbols. Check your connection.'));
-            }
-            if (!Array.isArray(rawSymbols)) {
-                throw new Error(localize('Connection error: active symbols response was invalid.'));
-            }
-            const { markets, skipped } = selectVolatilityMarkets(rawSymbols);
-            setSkippedMarkets(skipped);
+            const { markets: all_markets, skipped } = await loadVolatilityMarkets();
+            setSkippedMarkets(is_manual ? [] : skipped);
 
-            if (markets.length === 0) {
+            let markets = all_markets;
+            if (is_manual) {
+                markets = all_markets.filter((m: any) => symbolOf(m) === manual_symbol);
+                if (markets.length === 0) {
+                    const closed = skipped.find(k => k.symbol === manual_symbol);
+                    setErrorMsg(
+                        closed
+                            ? `${closed.displayName}: ${closed.reason}.`
+                            : localize('The selected index is not available right now.')
+                    );
+                    setScanStatus('error');
+                    return;
+                }
+            } else if (markets.length === 0) {
                 if (skipped.length > 0) {
                     setRanking(rankMarkets([]));
                     setScanStatus('done');
@@ -468,7 +604,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
             }
 
             const analyses = await scanMarkets(markets, fetchHistory, {
-                count: Math.min(MAX_TICKS, Math.max(DEFAULT_FETCH_COUNT, parsed_min_ticks)),
+                count: Math.min(MAX_TICKS, Math.max(is_manual ? MANUAL_FETCH_COUNT : DEFAULT_FETCH_COUNT, parsed_min_ticks)),
                 minObservations: parsed_min_ticks,
                 concurrency: 3,
                 timeout: 10000,
@@ -558,6 +694,69 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                     data-testid='dt_digit_scanner_modal_content'
                 >
                     <div className='digit-scanner-modal__controls' data-testid='dt_digit_scanner_controls'>
+                        <p className='digit-scanner-modal__controls-label'>{localize('Scan mode')}</p>
+                        <div className='digit-scanner-modal__segment' role='group' aria-label={localize('Scan mode')}>
+                            {(['auto', 'manual'] as ScanMode[]).map(mode => (
+                                <button
+                                    key={mode}
+                                    type='button'
+                                    data-testid={`dt_digit_scanner_mode_${mode}`}
+                                    aria-pressed={scan_mode === mode}
+                                    disabled={scan_status === 'scanning'}
+                                    className={`digit-scanner-modal__segment-button${
+                                        scan_mode === mode ? ' digit-scanner-modal__segment-button--active' : ''
+                                    }`}
+                                    onClick={() => chooseMode(mode)}
+                                >
+                                    {mode === 'auto' ? localize('Auto (best market)') : localize('Manual (choose index)')}
+                                </button>
+                            ))}
+                        </div>
+                        {is_manual && (
+                            <div className='digit-scanner-modal__manual-picker'>
+                                <label className='digit-scanner-modal__controls-label' htmlFor='digit-scanner-market'>
+                                    {localize('Volatility index')}
+                                </label>
+                                {market_options_status === 'loading' && (
+                                    <p className='digit-scanner-modal__hint'>{localize('Loading markets…')}</p>
+                                )}
+                                {market_options_status === 'error' && (
+                                    <p className='digit-scanner-modal__message digit-scanner-modal__message--error' data-testid='dt_digit_scanner_market_error'>
+                                        {market_options_error}{' '}
+                                        <button
+                                            type='button'
+                                            className='digit-scanner-modal__link-button'
+                                            data-testid='dt_digit_scanner_market_retry'
+                                            onClick={loadMarketOptions}
+                                        >
+                                            {localize('Retry')}
+                                        </button>
+                                    </p>
+                                )}
+                                {market_options_status === 'ready' && (
+                                    <select
+                                        id='digit-scanner-market'
+                                        data-testid='dt_digit_scanner_market_select'
+                                        className='digit-scanner-modal__select'
+                                        value={manual_symbol}
+                                        disabled={scan_status === 'scanning'}
+                                        onChange={e => {
+                                            setManualSymbol(e.target.value);
+                                            resetResults();
+                                        }}
+                                    >
+                                        {market_options.map(o => (
+                                            <option key={o.symbol} value={o.symbol} disabled={!!o.unavailableReason}>
+                                                {o.unavailableReason
+                                                    ? `${o.displayName} (${o.unavailableReason})`
+                                                    : o.displayName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        )}
+
                         <p className='digit-scanner-modal__controls-label'>{localize('Trade type')}</p>
                         <div className='digit-scanner-modal__segment' role='group' aria-label={localize('Trade type')}>
                             {TRADE_KINDS.map(kind => (
@@ -726,7 +925,9 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                     {scan_status === 'idle' && !ranking && (
                         <p className='digit-scanner-modal__message'>
                             {localize(
-                                'Click Scan to analyse recent ticks of each volatility market and find digit patterns.'
+                                is_manual
+                                    ? 'Choose a volatility index, then click Scan to run your selected strategies on its recent ticks.'
+                                    : 'Click Scan to analyse recent ticks of each volatility market and find digit patterns.'
                             )}
                         </p>
                     )}
@@ -742,16 +943,41 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
 
                     {ranking && (
                         <div data-testid='dt_digit_scanner_results'>
-                            {ranking.selected && (
-                                <p className='digit-scanner-modal__selected' data-testid='dt_digit_scanner_selected'>
-                                    {`${localize('Selected')}: ${ranking.selected.analysis.symbol} · ${formatPick(
-                                        ranking.selected.recommendation.direction,
-                                        ranking.selected.recommendation.digit
-                                    )}`}
-                                </p>
+                            {is_manual && (
+                                <>
+                                    {ranking.ranked[0] || ranking.excluded[0] ? (
+                                        <ManualResult
+                                            analysis={(ranking.ranked[0]?.analysis ?? ranking.excluded[0]) as MarketAnalysis}
+                                            onSelect={handleRowSelect}
+                                            isRunning={is_running}
+                                        />
+                                    ) : (
+                                        <p className='digit-scanner-modal__message'>{localize('No data was returned for this index.')}</p>
+                                    )}
+                                </>
                             )}
 
-                            {ranking.ranked.length === 0 && (
+                            {!is_manual && ranking.selected && (
+                                <>
+                                    <p className='digit-scanner-modal__selected' data-testid='dt_digit_scanner_selected'>
+                                        {`${localize('Selected')}: ${ranking.selected.analysis.symbol} · ${formatPick(
+                                            ranking.selected.recommendation.direction,
+                                            ranking.selected.recommendation.digit
+                                        )}`}
+                                    </p>
+                                    <button
+                                        type='button'
+                                        className='digit-scanner-modal__select-button'
+                                        data-testid='dt_digit_scanner_use_best'
+                                        disabled={is_running}
+                                        onClick={() => handleRowSelect(ranking.selected.analysis)}
+                                    >
+                                        {localize('Use best market')}
+                                    </button>
+                                </>
+                            )}
+
+                            {!is_manual && ranking.ranked.length === 0 && (
                                 <p className='digit-scanner-modal__message' data-testid='dt_digit_scanner_no_results'>
                                     {skippedMarkets.length > 0 && ranking.excluded.length === 0
                                         ? localize('No open volatility markets were available to scan.')
@@ -759,7 +985,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                 </p>
                             )}
 
-                            {ranking.ranked.length > 0 && (
+                            {!is_manual && ranking.ranked.length > 0 && (
                                 <>
                                     <table className='digit-scanner-modal__results-table'>
                                         <thead>
@@ -797,7 +1023,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                 </>
                             )}
 
-                            {(ranking.excluded.length > 0 || skippedMarkets.length > 0) && (
+                            {!is_manual && (ranking.excluded.length > 0 || skippedMarkets.length > 0) && (
                                 <>
                                     <p className='digit-scanner-modal__excluded-title'>{localize('Excluded markets')}</p>
                                     <table className='digit-scanner-modal__excluded-table'>
