@@ -183,6 +183,19 @@ const waitForFieldOption = async (
     return false;
 };
 
+/** Option values currently offered by a dropdown field, for error messages. */
+const optionValuesOf = (block: any, fieldName: string): string[] => {
+    const field = block?.getField?.(fieldName);
+    if (!field || typeof field.getOptions !== 'function') return [];
+    const options = field.getOptions(false) ?? [];
+    return options.map((option: any) => (Array.isArray(option) ? String(option[1] ?? option[0]) : String(option)));
+};
+
+const listOptions = (block: any, fieldName: string) => {
+    const values = optionValuesOf(block, fieldName).filter(value => value !== '');
+    return values.length ? ` Available: ${values.join(', ')}.` : ' No options are loaded yet.';
+};
+
 const getPredictionBlock = (block: any): any => {
     if (!block) return null;
     const input = block.getInput?.('PREDICTION');
@@ -236,7 +249,10 @@ export const ensureTradeType = async (
     if (String(categoryBefore ?? '').trim() !== 'digits') {
         const categoryReady = await waitForFieldOption(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory, 'digits');
         if (!categoryReady) {
-            return { ok: false, reason: 'Digits trade type category is unavailable for this symbol.' };
+            return {
+                ok: false,
+                reason: `Digits trade type category is unavailable for this symbol.${listOptions(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory)}`,
+            };
         }
         setFieldValue(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory, 'digits');
         fireFieldChange(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory, categoryBefore, 'digits');
@@ -247,7 +263,10 @@ export const ensureTradeType = async (
     if (String(tradeTypeBefore ?? '').trim() !== tradeType) {
         const tradeTypeReady = await waitForFieldOption(tradeTypeBlock, FIELD_NAMES.tradeType, tradeType);
         if (!tradeTypeReady) {
-            return { ok: false, reason: `${label} trade type is unavailable for this symbol.` };
+            return {
+                ok: false,
+                reason: `${label} trade type is unavailable for this symbol.${listOptions(tradeTypeBlock, FIELD_NAMES.tradeType)}`,
+            };
         }
         setFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType, tradeType);
         fireFieldChange(tradeTypeBlock, FIELD_NAMES.tradeType, tradeTypeBefore, tradeType);
@@ -325,6 +344,9 @@ export const previewScannerPick = (workspace: any, pick: ScannerPickInput): Scan
     }
 };
 
+const MAX_APPLY_ATTEMPTS = 3;
+const SETTLE_MS = 350;
+
 export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): Promise<ScannerPickResult> => {
     try {
         const preview = previewScannerPick(workspace, pick);
@@ -348,17 +370,37 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
         const targetSymbol = pick.symbol;
         const targetDigit = spec.hasBarrier ? (pick.digit as number) : null;
 
-        const originalGroup = window?.Blockly?.Events?.getGroup?.() ?? null;
-        window.Blockly.Events.setGroup('scanner-pick-apply');
+        const readState = () => ({
+            symbol: getFieldValue(marketBlock, FIELD_NAMES.symbol),
+            category: getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory),
+            tradeType: getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType),
+            type: getContractTypeValue(contractTypeBlock),
+            prediction: getPredictionValue(predictionBlock),
+        });
+        type State = ReturnType<typeof readState>;
 
-        try {
-            const symbolBefore = getFieldValue(marketBlock, FIELD_NAMES.symbol);
-            if (symbolBefore !== targetSymbol) {
+        // Blockly refreshes these dropdowns asynchronously after the contracts API answers, and a late
+        // refresh can put an older value back. A pick only counts once every field holds the target.
+        const matchesTarget = (st: State) =>
+            st.symbol === targetSymbol &&
+            String(st.category ?? '').trim() === 'digits' &&
+            String(st.tradeType ?? '').trim() === spec.tradeType &&
+            st.type === targetType &&
+            (targetDigit === null || String(st.prediction) === String(targetDigit));
+
+        const describeState = (st: State) =>
+            `symbol ${st.symbol ?? '-'}, trade type ${st.category ?? '-'} > ${st.tradeType ?? '-'}, contract ${st.type ?? '-'}` +
+            (targetDigit !== null ? `, digit ${st.prediction ?? '-'}` : '');
+
+        const initial = readState();
+
+        const applySteps = async (): Promise<ScannerPickFailure | { ok: true }> => {
+            const symbolNow = getFieldValue(marketBlock, FIELD_NAMES.symbol);
+            if (symbolNow !== targetSymbol) {
                 setFieldValue(marketBlock, FIELD_NAMES.symbol, targetSymbol);
-                fireFieldChange(marketBlock, FIELD_NAMES.symbol, symbolBefore, targetSymbol);
+                fireFieldChange(marketBlock, FIELD_NAMES.symbol, symbolNow, targetSymbol);
+                await sleep(500);
             }
-
-            await sleep(500);
 
             const categoryState = await ensureTradeType(tradeTypeBlock, spec.tradeType, spec.label);
             if (!categoryState.ok) {
@@ -367,44 +409,77 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
 
             await sleep(250);
 
-            const typeBefore = getContractTypeValue(contractTypeBlock);
-            if (typeBefore !== targetType) {
+            const typeNow = getContractTypeValue(contractTypeBlock);
+            if (typeNow !== targetType) {
                 const contractTypeReady = await waitForFieldOption(contractTypeBlock, FIELD_NAMES.type, targetType);
                 if (!contractTypeReady) {
                     return {
                         ok: false,
-                        reason: `${spec.label} contract type is unavailable for symbol ${targetSymbol}.`,
+                        reason: `${spec.label} contract type is unavailable for symbol ${targetSymbol}. Trade type is currently ${
+                            getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType) ?? '-'
+                        }.${listOptions(contractTypeBlock, FIELD_NAMES.type)}`,
                     };
                 }
                 setFieldValue(contractTypeBlock, FIELD_NAMES.type, targetType);
-                fireFieldChange(contractTypeBlock, FIELD_NAMES.type, typeBefore, targetType);
+                fireFieldChange(contractTypeBlock, FIELD_NAMES.type, typeNow, targetType);
                 await sleep(200);
             }
 
-            let predictionBefore: string | number | null = null;
             if (spec.hasBarrier && targetDigit !== null) {
                 const predictionTarget = await waitForPredictionInput(predictionBlock, 3000);
                 if (!predictionTarget) {
                     return { ok: false, reason: 'Prediction input not available for this trade type.' };
                 }
-
-                predictionBefore = getPredictionValue(predictionBlock);
-                if (predictionBefore !== targetDigit) {
+                const predictionNow = getPredictionValue(predictionBlock);
+                if (predictionNow !== targetDigit && String(predictionNow) !== String(targetDigit)) {
                     setPredictionValue(predictionBlock, targetDigit);
-                    fireFieldChange(predictionTarget, 'NUM', predictionBefore, targetDigit);
+                    fireFieldChange(predictionTarget, 'NUM', predictionNow, targetDigit);
                 }
             }
+            return { ok: true };
+        };
 
-            workspace?.render?.();
+        const originalGroup = window?.Blockly?.Events?.getGroup?.() ?? null;
+        window.Blockly.Events.setGroup('scanner-pick-apply');
 
-            return {
-                ok: true,
-                symbol: { before: symbolBefore, after: targetSymbol },
-                category: preview.category,
-                tradeType: preview.tradeType,
-                type: { before: typeBefore, after: targetType },
-                prediction: targetDigit === null ? null : { before: predictionBefore, after: targetDigit },
-            };
+        try {
+            let failure: ScannerPickFailure | null = null;
+
+            for (let attempt = 1; attempt <= MAX_APPLY_ATTEMPTS; attempt++) {
+                const stepResult = await applySteps();
+                if (!stepResult.ok) {
+                    failure = stepResult as ScannerPickFailure;
+                    if (attempt < MAX_APPLY_ATTEMPTS) await sleep(600);
+                    continue;
+                }
+
+                // Let any late Blockly refresh land, then require the values to still be there.
+                await sleep(SETTLE_MS);
+                if (matchesTarget(readState())) {
+                    await sleep(SETTLE_MS);
+                    const final = readState();
+                    if (matchesTarget(final)) {
+                        workspace?.render?.();
+                        return {
+                            ok: true,
+                            symbol: { before: initial.symbol, after: targetSymbol },
+                            category: preview.category,
+                            tradeType: preview.tradeType,
+                            type: { before: initial.type, after: targetType },
+                            prediction:
+                                targetDigit === null ? null : { before: initial.prediction, after: targetDigit },
+                        };
+                    }
+                }
+                failure = {
+                    ok: false,
+                    reason: `Blockly did not keep the ${spec.label} settings after ${attempt} attempt(s). Expected ${spec.tradeType} > ${targetType}; found ${describeState(
+                        readState()
+                    )}.`,
+                };
+            }
+
+            return failure ?? { ok: false, reason: 'Unable to apply scanner pick.' };
         } finally {
             if (window?.Blockly?.Events) {
                 window.Blockly.Events.setGroup(originalGroup);
