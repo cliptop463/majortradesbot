@@ -77,8 +77,9 @@ describe('digit scanner scan utilities', () => {
 
         expect(results[0].status).toBe('error');
         expect(results[0].message).toContain('network timeout');
-        expect(results[1].status).toBe('ok');
-        expect(results[1].recommendation).not.toBeNull();
+        expect(results[0].recommendation).toBeNull();
+        expect(results[1].status).not.toBe('error');
+        expect(results[1].observations).toBe(250);
     });
 
     it('respects the 200-tick minimum when scanning history', async () => {
@@ -92,3 +93,63 @@ describe('digit scanner scan utilities', () => {
         expect(result[0].recommendation).toBeNull();
     });
 });
+
+describe('scanMarkets data-quality guards', () => {
+    const market = () => [makeSymbol({ symbol: 'R_100', underlying_symbol: 'R_100', pip_size: 0.01 })];
+    const randomish = (n: number) => Array.from({ length: n }, (_, i) => Number((100 + ((i * 37) % 100) / 100 + Math.floor(i / 100)).toFixed(2)));
+
+    it('excludes a market whose prices do not match the configured precision', async () => {
+        // Prices only show 1 decimal place while the pip says 2: last digits would be padded zeros.
+        const prices = Array.from({ length: 300 }, (_, i) => Number((100 + (i % 10) / 10).toFixed(1)));
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
+        expect(result.status).toBe('error');
+        expect(result.message).toContain('Precision mismatch');
+        expect(result.recommendation).toBeNull();
+    });
+
+    it('excludes a degenerate digit stream instead of recommending it', async () => {
+        const prices = Array.from({ length: 300 }, (_, i) => Number((100 + i * 0.1 + 0.05).toFixed(2)));
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
+        expect(result.status).toBe('error');
+        expect(result.message).toContain('degenerate');
+        expect(result.recommendation).toBeNull();
+    });
+
+    it('still analyses a market whose precision matches', async () => {
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices: randomish(300) });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, { count: 300, minObservations: 200 });
+        expect(result.status).not.toBe('error');
+    });
+
+    it('uses a supplied analyzer instead of the default ensemble, after the data-quality checks', async () => {
+        const analyze = jest.fn().mockReturnValue({
+            strategies: [],
+            recommendation: { direction: 'EVEN', digit: null, agree: 2, disagree: 0, eligible: 3, heuristicScore: 71 },
+        });
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices: randomish(300) });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, {
+            count: 300,
+            minObservations: 200,
+            analyze: analyze as any,
+        });
+        expect(analyze).toHaveBeenCalledTimes(1);
+        expect((analyze.mock.calls[0][0] as number[]).length).toBe(300);
+        expect(result.recommendation?.direction).toBe('EVEN');
+    });
+
+    it('does not call the analyzer for a market that fails the precision check', async () => {
+        const analyze = jest.fn();
+        const prices = Array.from({ length: 300 }, (_, i) => Number((100 + (i % 10) / 10).toFixed(1)));
+        const fetchHistoryMock: any = (jest.fn() as any).mockResolvedValue({ prices });
+        const [result] = await scanMarkets(market(), fetchHistoryMock as any, {
+            count: 300,
+            minObservations: 200,
+            analyze: analyze as any,
+        });
+        expect(analyze).not.toHaveBeenCalled();
+        expect(result.status).toBe('error');
+    });
+});
+

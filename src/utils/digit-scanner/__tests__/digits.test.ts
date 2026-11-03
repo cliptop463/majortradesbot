@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { extractLastDigits, pipDecimals, pipSizeFromPip, getLastDigit } from '../digits';
+import { extractLastDigits, pipDecimals, pipSizeFromPip, getLastDigit, checkPrecision, decimalPlaces } from '../digits';
 
 describe('pipDecimals', () => {
     it('derives correct decimal places from standard pip values', () => {
@@ -69,5 +69,35 @@ describe('extractLastDigits', () => {
         expect(() => extractLastDigits([100], 13)).toThrow(RangeError);
         expect(() => extractLastDigits([100], 2.5)).toThrow(RangeError);
         expect(() => extractLastDigits([100], NaN)).toThrow(RangeError);
+    });
+});
+
+describe('precision cross-check', () => {
+    const prices = (decimals: number, n = 300) =>
+        Array.from({ length: n }, (_, i) => Number((100 + (i * 0.137) % 1 + i * 10 ** -decimals).toFixed(decimals)));
+
+    it('counts decimal places, including trailing-zero loss and exponents', () => {
+        expect(decimalPlaces(1234.5)).toBe(1);
+        expect(decimalPlaces(1234.56)).toBe(2);
+        expect(decimalPlaces(100)).toBe(0);
+        expect(decimalPlaces(1e-7)).toBe(7);
+    });
+
+    it('accepts prices whose observed precision matches the configured pip size', () => {
+        expect(checkPrecision(prices(2), 2).ok).toBe(true);
+        expect(checkPrecision(prices(4), 4).ok).toBe(true);
+    });
+
+    it('rejects a pip size that is too low or too high for the prices', () => {
+        const tooLow = checkPrecision(prices(2), 0);
+        expect(tooLow.ok).toBe(false);
+        const tooHigh = checkPrecision(prices(2), 4);
+        expect(tooHigh.ok).toBe(false);
+        expect(tooHigh.reason).toContain('Precision mismatch');
+    });
+
+    it('rejects when there are no valid prices', () => {
+        expect(checkPrecision([], 2).ok).toBe(false);
+        expect(checkPrecision('nope', 2).ok).toBe(false);
     });
 });

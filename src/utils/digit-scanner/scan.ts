@@ -1,8 +1,8 @@
 import { api_base } from '@/external/bot-skeleton/services/api/api-base';
 import type { ActiveSymbol } from './types';
-import { extractLastDigits, pipDecimals } from './digits';
+import { checkPrecision, extractLastDigits, pipDecimals } from './digits';
 import { analyzeDigits } from './ensemble';
-import type { MarketAnalysis } from './types';
+import type { EnsembleResult, MarketAnalysis } from './types';
 
 export const SCAN_DEFAULTS = {
     count: 500,
@@ -29,6 +29,13 @@ export interface ScanMarketsOptions {
     timeout?: number;
     directionFilter?: 'ALL' | 'MATCHES' | 'DIFFERS';
     minAgree?: number;
+    /**
+     * Replaces the default statistical ensemble, e.g. with a selected set of pattern strategies for
+     * Even/Odd or Over/Under. Data-quality checks (precision, minimum ticks) still run first.
+     */
+    analyze?: (digits: readonly number[]) => EnsembleResult;
+    /** Called with each market's valid digits once they pass the data-quality checks (used for validation). */
+    onDigits?: (symbol: string, digits: readonly number[]) => void;
 }
 
 export async function fetchHistory(
@@ -189,6 +196,30 @@ export async function scanMarkets(
 
         const { digits, dropped } = extractLastDigits(rawHistory.prices, pipSize);
 
+        const failed = (message: string): MarketAnalysis => ({
+            symbol,
+            displayName,
+            market: market.market || '',
+            submarket: market.submarket || '',
+            pipSize,
+            observations: digits.length,
+            dropped,
+            status: 'error',
+            message,
+            strategies: [],
+            recommendation: null,
+        });
+
+        if (digits.length >= minObservations) {
+            const precision = checkPrecision(rawHistory.prices, pipSize);
+            if (!precision.ok) return failed(precision.reason ?? 'Precision mismatch.');
+            if (new Set(digits).size < 3) {
+                return failed(
+                    `Digit stream looks degenerate (only ${new Set(digits).size} distinct digit(s) in ${digits.length} ticks); likely a feed or precision problem.`
+                );
+            }
+        }
+
         if (digits.length < minObservations) {
             return {
                 symbol,
@@ -205,10 +236,14 @@ export async function scanMarkets(
             };
         }
 
-        const ensemble = analyzeDigits(digits, {
-            directionFilter: options?.directionFilter,
-            minAgree: options?.minAgree,
-        });
+        options?.onDigits?.(symbol, digits);
+
+        const ensemble = options?.analyze
+            ? options.analyze(digits)
+            : analyzeDigits(digits, {
+                  directionFilter: options?.directionFilter,
+                  minAgree: options?.minAgree,
+              });
 
         if (!ensemble.recommendation) {
             return {
