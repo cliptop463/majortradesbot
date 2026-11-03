@@ -155,6 +155,14 @@ const findRequiredBlocks = (workspace: any) => {
     };
 };
 
+/** Symbol currently chosen in the bot's market block, or null when it cannot be read. */
+export const getSelectedSymbol = (workspace: any): string | null => {
+    const blocks = workspace?.getAllBlocks?.() ?? [];
+    const market = blocks.find((block: any) => block?.type === BLOCK_TYPES.tradeDefinitionMarket);
+    const value = getFieldValue(market, FIELD_NAMES.symbol);
+    return typeof value === 'string' && value.trim() !== '' ? value : null;
+};
+
 const isBotRunning = () => !!window?.run_panel?.is_running;
 
 const waitForFieldOption = async (
