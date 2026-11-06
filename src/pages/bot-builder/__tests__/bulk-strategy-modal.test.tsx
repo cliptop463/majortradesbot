@@ -90,6 +90,8 @@ describe('defaults and saved settings', () => {
         expect(screen.getByTestId('dt_bulk_worst_case').textContent).toContain('7.35'); // 3 x 0.35 x (1+2+4)
         expect(screen.queryByTestId('dt_bulk_problems')).toBeNull();
         expect(screen.getByTestId('dialog-confirm').disabled).toBe(false);
+        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Start Paper test');
+        expect(screen.getByTestId('dt_bulk_setup').textContent).toContain('saved automatically when you start');
         expect(screen.getByTestId('dt_bulk_disclaimer').textContent).toContain('No strategy changes the odds');
     });
 
@@ -107,6 +109,7 @@ describe('defaults and saved settings', () => {
         expect(screen.getByTestId('dt_bulk_stake').value).toBe('2.5');
         expect(screen.getByTestId('dt_bulk_mode_live').getAttribute('aria-pressed')).toBe('true');
         expect(screen.getByTestId('dt_bulk_account_demo').getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Start Live trading');
     });
 
     it('saves to localStorage, with no secrets in it', () => {
@@ -214,6 +217,21 @@ describe('Real account confirmation', () => {
 });
 
 describe('running', () => {
+    it('starts with edited settings without requiring a separate save', async () => {
+        render(<BulkStrategyModal {...props()} />);
+        field('stake', '0.5');
+        expect(screen.getByTestId('dt_bulk_save').textContent).toBe('Save');
+
+        await startRun();
+
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toMatchObject({ stake: 0.5, mode: 'paper' });
+        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Stop');
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_stop'));
+            await flush();
+        });
+    });
+
     it('Paper: sends no buy orders, fills the log table from real ticks and stops cleanly', async () => {
         save({});
         const p = props();
@@ -301,7 +319,7 @@ describe('running', () => {
         render(<BulkStrategyModal {...props()} />);
         await startRun();
         expect(screen.getByTestId('dt_bulk_error').textContent).toContain('Symbol is invalid.');
-        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Start');
+        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Start Paper test');
     });
 
     it('stops and cancels subscriptions when the page is left', async () => {

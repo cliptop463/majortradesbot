@@ -16,6 +16,16 @@
         margin-bottom: 1.2rem;
     }
 
+    &__setup {
+        margin: 0 0 1rem;
+        padding: 0.8rem;
+        border: 1px solid var(--border-normal);
+        border-radius: 0.4rem;
+        font-size: 1.2rem;
+        line-height: 1.5;
+        color: var(--text-prominent);
+    }
+
     &__label {
         display: block;
         margin: 0.8rem 0 0.4rem;

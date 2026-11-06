@@ -186,8 +186,11 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
             }
         }
 
-        saveConfig(config); // the saved config is exactly what runs
-        setSaved(true);
+        const config_saved = saveConfig(config);
+        setSaved(config_saved);
+        if (!config_saved) {
+            setErrorMsg(localize('Settings could not be saved in this browser. This run will still use the current settings.'));
+        }
         setLogs([]);
         setSummary(null);
         setTickInfo(null);
@@ -246,7 +249,9 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                         : localize('Stop')
                     : run_state === 'starting'
                       ? localize('Starting…')
-                      : localize('Start')
+                      : config.mode === 'paper'
+                        ? localize('Start Paper test')
+                        : localize('Start Live trading')
             }
             onConfirm={run_state === 'running' ? stop : start}
             is_confirm_disabled={run_state === 'starting' || run_state === 'stopping' || (run_state === 'idle' && problems.length > 0)}
@@ -255,6 +260,12 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
             className='bulk-strategy-modal'
         >
             <div className='bulk-strategy-modal__content' data-testid='dt_bulk_modal'>
+                <p className='bulk-strategy-modal__setup' data-testid='dt_bulk_setup'>
+                    {localize(
+                        'Choose a strategy and market, set your stake and stop limits, then start. Paper is selected by default and places no orders. Your current settings are saved automatically when you start.'
+                    )}
+                </p>
+
                 {/* ─── Strategy and market ─── */}
                 <section className='bulk-strategy-modal__section'>
                     <label className='bulk-strategy-modal__label' htmlFor='bulk-strategy'>

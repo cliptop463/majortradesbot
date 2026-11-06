@@ -73,6 +73,15 @@ npm run dev
 The app is available at `http://localhost:4003`. (`npm install` and `npm run dev`
 also regenerate brand CSS — see Branding below.)
 
+## Running a bulk strategy
+
+1. Open **Bulk Strategy** from the bot builder toolbar.
+2. Choose a strategy and market, then set the stake, bulk size, profit target, and max loss. The risk presets and martingale settings are optional.
+3. Keep **Paper** selected to test with live market quotes without placing orders, then choose **Start Paper test**. Starting uses and saves the values currently shown; the separate **Save** button is optional.
+4. Use **Start Live trading** only when you are ready to place real or Demo-account orders. Live mode requires an authorized account, and enabling a Real account requires a separate confirmation.
+
+The modal displays any setup or safety-limit problems that must be fixed before starting. Use **Stop** to end a run; contracts already bought remain open on Deriv.
+
 ## Step 4: Build for Production
 
 ```bash
