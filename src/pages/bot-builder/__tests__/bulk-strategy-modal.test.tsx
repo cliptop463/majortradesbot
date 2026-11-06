@@ -148,6 +148,23 @@ describe('risk presets and the safety cap', () => {
         expect(screen.getByTestId('dialog-confirm').disabled).toBe(false);
     });
 
+    it('explains the blocked Run button and offers an explicit max-loss adjustment', () => {
+        render(<BulkStrategyModal {...props()} />);
+        fireEvent.click(screen.getByTestId('dt_bulk_risk_high'));
+        field('stake', '1');
+        field('maxLoss', '50');
+
+        expect(screen.getByTestId('dt_bulk_worst_case').textContent).toContain('75.00');
+        expect(screen.getByTestId('dt_bulk_limit_help').textContent).toContain('Run is blocked');
+        expect(screen.getByTestId('dialog-confirm').disabled).toBe(true);
+
+        fireEvent.click(screen.getByTestId('dt_bulk_set_max_loss'));
+
+        expect(screen.getByTestId('dt_bulk_maxLoss').value).toBe('75');
+        expect(screen.queryByTestId('dt_bulk_limit_help')).toBeNull();
+        expect(screen.getByTestId('dialog-confirm').disabled).toBe(false);
+    });
+
     it('Low turns martingale off and hides its fields', () => {
         render(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_risk_low'));

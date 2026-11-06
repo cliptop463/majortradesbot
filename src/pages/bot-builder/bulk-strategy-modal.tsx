@@ -93,6 +93,8 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
 
     const problems = React.useMemo(() => validateConfig(config), [config]);
     const worst_case = problems.length === 0 || Number.isFinite(config.stake) ? worstCaseCost(config) : NaN;
+    const worst_case_exceeds_limit =
+        Number.isFinite(worst_case) && Number.isFinite(config.maxLoss) && worst_case > config.maxLoss;
     const is_active = run_state !== 'idle';
     const locked = is_active;
 
@@ -509,6 +511,28 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                     <p className='bulk-strategy-modal__worst' data-testid='dt_bulk_worst_case'>
                         {localize('Worst case before the max-loss stop: {{amount}}', { amount: money(worst_case) })}
                     </p>
+                    {worst_case_exceeds_limit && (
+                        <div className='bulk-strategy-modal__limit-help' data-testid='dt_bulk_limit_help'>
+                            <p className='bulk-strategy-modal__message bulk-strategy-modal__message--error'>
+                                {localize(
+                                    'Run is blocked because Max loss is below the worst-case cost. Raise Max loss to at least {{amount}}, or reduce your stake, bulk size, or martingale settings.',
+                                    { amount: money(worst_case) }
+                                )}
+                            </p>
+                            <button
+                                type='button'
+                                className='bulk-strategy-modal__button'
+                                data-testid='dt_bulk_set_max_loss'
+                                disabled={locked}
+                                onClick={() => {
+                                    setText(current => ({ ...current, maxLoss: String(worst_case) }));
+                                    touch();
+                                }}
+                            >
+                                {localize('Set Max loss to {{amount}}', { amount: money(worst_case) })}
+                            </button>
+                        </div>
+                    )}
                     {is_real_live && (
                         <p className='bulk-strategy-modal__message bulk-strategy-modal__message--error' data-testid='dt_bulk_real_banner'>
                             {localize('REAL ACCOUNT + LIVE: this will place real contracts.')}
