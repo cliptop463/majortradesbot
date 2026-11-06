@@ -250,8 +250,8 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                     : run_state === 'starting'
                       ? localize('Starting…')
                       : config.mode === 'paper'
-                        ? localize('Start Paper test')
-                        : localize('Start Live trading')
+                        ? localize('Run Paper strategy')
+                        : localize('Run Live strategy')
             }
             onConfirm={run_state === 'running' ? stop : start}
             is_confirm_disabled={run_state === 'starting' || run_state === 'stopping' || (run_state === 'idle' && problems.length > 0)}
