@@ -1,0 +1,250 @@
+// Bulk Strategy modal. Uses the app's CSS variables so it follows light and dark themes.
+
+.bulk-strategy-modal {
+    &__content {
+        width: 100%;
+        max-width: 100%;
+        max-height: 62vh;
+        overflow-x: hidden;
+        overflow-y: auto; // the whole panel scrolls on small screens
+        padding: 0.4rem 0.8rem;
+        color: var(--text-prominent);
+        -webkit-overflow-scrolling: touch;
+    }
+
+    &__section {
+        margin-bottom: 1.2rem;
+    }
+
+    &__label {
+        display: block;
+        margin: 0.8rem 0 0.4rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: var(--text-less-prominent);
+    }
+
+    &__hint {
+        margin: 0.4rem 0 0.8rem;
+        font-size: 1.1rem;
+        color: var(--text-less-prominent);
+        overflow-wrap: anywhere;
+    }
+
+    &__select,
+    &__field input {
+        width: 100%;
+        min-height: 3.6rem;
+        padding: 0.4rem 0.8rem;
+        border: 1px solid var(--border-normal);
+        border-radius: 0.4rem;
+        background: transparent;
+        color: var(--text-prominent);
+        font-size: 1.3rem;
+    }
+
+    &__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+        gap: 0.8rem;
+        margin-top: 0.8rem;
+    }
+
+    &__field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        font-size: 1.1rem;
+        color: var(--text-less-prominent);
+    }
+
+    &__check {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.8rem;
+        margin: 0.8rem 0;
+        font-size: 1.2rem;
+
+        input {
+            flex: none;
+            margin-top: 0.2rem;
+        }
+    }
+
+    &__segment {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    &__segment-button {
+        min-height: 3.2rem;
+        padding: 0.4rem 1.2rem;
+        border: 1px solid var(--border-normal);
+        border-radius: 1.6rem;
+        background: transparent;
+        color: var(--text-prominent);
+        font-size: 1.2rem;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        &--active {
+            border-color: var(--button-primary-default);
+            background: var(--button-primary-default);
+            color: var(--text-colored-background, #fff);
+        }
+
+        &--danger.bulk-strategy-modal__segment-button--active {
+            border-color: var(--status-danger, #ec3f3f);
+            background: var(--status-danger, #ec3f3f);
+        }
+    }
+
+    &__warning {
+        margin: 0.8rem 0;
+        padding: 0.8rem;
+        border: 1px solid var(--status-danger, #ec3f3f);
+        border-radius: 0.4rem;
+        font-size: 1.2rem;
+    }
+
+    // Button holder: one row that scrolls sideways instead of wrapping off-screen.
+    &__actions {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 0.8rem;
+        margin: 0.4rem 0 1.2rem;
+        padding-bottom: 0.4rem;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    &__button {
+        flex: 0 0 auto;
+        min-height: 3.6rem;
+        padding: 0.4rem 1.6rem;
+        border: 1px solid var(--border-normal);
+        border-radius: 0.4rem;
+        background: transparent;
+        color: var(--text-prominent);
+        font-size: 1.2rem;
+        white-space: nowrap;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        &--danger {
+            border-color: var(--status-danger, #ec3f3f);
+            color: var(--status-danger, #ec3f3f);
+        }
+    }
+
+    &__worst {
+        margin: 0;
+        font-weight: 700;
+    }
+
+    &__problems {
+        margin: 0.6rem 0 0;
+        padding-left: 1.8rem;
+        font-size: 1.2rem;
+        color: var(--status-danger, #ec3f3f);
+        overflow-wrap: anywhere;
+    }
+
+    &__message {
+        margin: 0.6rem 0;
+        font-size: 1.2rem;
+        overflow-wrap: anywhere;
+
+        &--error {
+            color: var(--status-danger, #ec3f3f);
+        }
+    }
+
+    &__status {
+        margin: 0;
+        font-size: 1.2rem;
+        overflow-wrap: anywhere;
+    }
+
+    &__table-wrap {
+        max-height: 20rem;
+        overflow: auto; // the log scrolls both ways
+        border: 1px solid var(--border-normal);
+        border-radius: 0.4rem;
+    }
+
+    &__table {
+        width: 100%;
+        min-width: 42rem;
+        border-collapse: collapse;
+        font-size: 1.1rem;
+
+        th,
+        td {
+            padding: 0.5rem 0.8rem;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: var(--general-main-1, transparent);
+            color: var(--text-less-prominent);
+        }
+    }
+
+    &__empty {
+        color: var(--text-less-prominent);
+    }
+
+    &__pos {
+        color: var(--status-success, #4bb4b3);
+    }
+
+    &__neg {
+        color: var(--status-danger, #ec3f3f);
+    }
+
+    &__summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+        gap: 0.6rem;
+        margin: 0;
+
+        > div {
+            padding: 0.6rem 0.8rem;
+            border: 1px solid var(--border-normal);
+            border-radius: 0.4rem;
+        }
+
+        dt {
+            font-size: 1rem;
+            color: var(--text-less-prominent);
+        }
+
+        dd {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+    }
+
+    &__disclaimer {
+        margin: 0.8rem 0 0;
+        font-size: 1.1rem;
+        font-style: italic;
+        color: var(--text-less-prominent);
+    }
+}

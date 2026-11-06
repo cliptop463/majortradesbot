@@ -13,12 +13,25 @@
     background-color: var(--general-main-1);
     z-index: 1;
 
+    // Button holder scrolls sideways instead of running off-screen when there are many buttons.
+    max-width: calc(100vw - 23.2rem - 1.6rem);
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+
+    > .toolbar__section {
+        flex: 0 0 auto; // keep the full width of the buttons so the holder can scroll
+    }
+
     @include mobile-or-tablet-screen {
         height: 64px;
         position: absolute;
         overflow-y: auto;
         inset-inline-start: 4rem;
         overflow-x: auto;
+        max-width: calc(100vw - 4rem);
         width: fit-content;
         padding: 0;
         scrollbar-width: none;
@@ -31,6 +44,8 @@
     }
 
     &__btn {
+        flex: 0 0 auto; // buttons keep their size and the holder scrolls, rather than squeezing the labels
+        white-space: nowrap;
         background-color: var(--button-primary-default) !important;
 
         &--icon {

@@ -14,6 +14,7 @@ import ToolbarButton from './toolbar/toolbar-button';
 import WorkspaceGroup from './toolbar/workspace-group';
 import DigitScannerModal from './digit-scanner-modal';
 import MatchesDiffersModal from './matches-differs-modal';
+import BulkStrategyModal from './bulk-strategy-modal';
 
 // Load the existing toolbar styles
 import './toolbar/toolbar.scss';
@@ -46,6 +47,9 @@ const Toolbar = observer(() => {
 
     const [is_matches_differs_open, setIsMatchesDiffersOpen] =
         React.useState(false);
+
+    const [is_bulk_open, setIsBulkOpen] = React.useState(false);
+    const [is_bulk_running, setIsBulkRunning] = React.useState(false);
 
     // Open Quick Strategy
     const handleQuickStrategyOpen = () => {
@@ -126,6 +130,20 @@ const Toolbar = observer(() => {
                         )}
                         is_bot_running={is_running}
                     />
+                    <ToolbarButton
+                        popover_message={localize(
+                            'Set up and run a bulk strategy: several contracts per round, with limits, on Paper or Live.'
+                        )}
+                        button_id='db-toolbar__bulk-strategy-button'
+                        button_classname='toolbar__btn toolbar__btn--icon toolbar__btn--digit-scanner'
+                        buttonOnClick={() => setIsBulkOpen(true)}
+                        button_text={
+                            is_bulk_running
+                                ? `${localize('Bulk Strategy')} ●`
+                                : localize('Bulk Strategy')
+                        }
+                        is_bot_running={false}
+                    />
 
                     {isDesktop && <WorkspaceGroup />}
                 </div>
@@ -179,6 +197,12 @@ const Toolbar = observer(() => {
                 onApplied={handleMatchesDiffersApplied}
                 is_running={is_running}
                 store_symbol={dashboard.bot_builder_symbol}
+            />
+            <BulkStrategyModal
+                isOpen={is_bulk_open}
+                onClose={() => setIsBulkOpen(false)}
+                is_running={is_running}
+                onRunningChange={setIsBulkRunning}
             />
         </React.Fragment>
     );
