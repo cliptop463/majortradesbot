@@ -1,9 +1,10 @@
 import {
     buildAuthorizationUrl,
     buildSignUpUrl,
-    getAuthInfo,
+    getStoredAuthInfo,
     parseReferralLink,
     parseLandingParams,
+    refreshAccessToken,
     resolveReferralViaProxy,
 } from '@/external/deriv-core';
 import type { AuthConfig } from '@/external/deriv-core';
@@ -73,9 +74,17 @@ const getDefaultServerURL = () => {
  */
 export const getSocketURL = async (): Promise<string> => {
     try {
-        const authInfo = getAuthInfo();
-        if (!authInfo || !authInfo.access_token) {
+        let authInfo = getStoredAuthInfo();
+        if (!authInfo?.access_token) {
             return getDefaultServerURL();
+        }
+
+        if (authInfo.expires_at && Date.now() >= authInfo.expires_at * 1000) {
+            const clientId = process.env.NEXT_PUBLIC_DERIV_APP_ID;
+            if (!authInfo.refresh_token || !clientId) {
+                return getDefaultServerURL();
+            }
+            authInfo = await refreshAccessToken(authInfo.refresh_token, clientId);
         }
 
         const wsUrl = await DerivWSAccountsService.getAuthenticatedWebSocketURL(authInfo.access_token);

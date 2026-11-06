@@ -233,6 +233,22 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
         await engine.current.stop();
     };
 
+    const action_label =
+        run_state === 'running' || run_state === 'stopping'
+            ? run_state === 'stopping'
+                ? localize('Stopping…')
+                : localize('Stop')
+            : run_state === 'starting'
+              ? localize('Starting…')
+              : config.mode === 'paper'
+                ? localize('Run Paper strategy')
+                : localize('Run Live strategy');
+    const action_disabled =
+        run_state === 'starting' ||
+        run_state === 'stopping' ||
+        (run_state === 'idle' && problems.length > 0);
+    const handleAction = () => (run_state === 'running' ? stop() : start());
+
     const strategy = getStrategy(base.strategyId);
     const net = logs.length ? logs[logs.length - 1].cumulative : 0;
     const is_real_live = config.account === 'real' && config.mode === 'live';
@@ -244,29 +260,18 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
             is_visible={isOpen}
             cancel_button_text={is_active ? localize('Hide') : localize('Close')}
             onCancel={onClose}
-            confirm_button_text={
-                run_state === 'running' || run_state === 'stopping'
-                    ? run_state === 'stopping'
-                        ? localize('Stopping…')
-                        : localize('Stop')
-                    : run_state === 'starting'
-                      ? localize('Starting…')
-                      : config.mode === 'paper'
-                        ? localize('Run Paper strategy')
-                        : localize('Run Live strategy')
-            }
-            onConfirm={run_state === 'running' ? stop : start}
-            is_confirm_disabled={run_state === 'starting' || run_state === 'stopping' || (run_state === 'idle' && problems.length > 0)}
+            onConfirm={handleAction}
             is_mobile_full_width={false}
             has_close_icon
             className='bulk-strategy-modal'
         >
-            <div className='bulk-strategy-modal__content' data-testid='dt_bulk_modal'>
-                <p className='bulk-strategy-modal__setup' data-testid='dt_bulk_setup'>
-                    {localize(
-                        'Choose a strategy and market, set your stake and stop limits, then start. Paper is selected by default and places no orders. Your current settings are saved automatically when you start.'
-                    )}
-                </p>
+            <div className='bulk-strategy-modal__layout'>
+                <div className='bulk-strategy-modal__content' data-testid='dt_bulk_modal'>
+                    <p className='bulk-strategy-modal__setup' data-testid='dt_bulk_setup'>
+                        {localize(
+                            'Choose a strategy and market, set your stake and stop limits, then start. Paper is selected by default and places no orders. Your current settings are saved automatically when you start.'
+                        )}
+                    </p>
 
                 {/* ─── Strategy and market ─── */}
                 <section className='bulk-strategy-modal__section'>
@@ -672,11 +677,23 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                     </section>
                 )}
 
-                <p className='bulk-strategy-modal__disclaimer' data-testid='dt_bulk_disclaimer'>
-                    {localize(
-                        'No strategy changes the odds. The entry filter only looks at past ticks, and martingale makes losses bigger. Stop leaves contracts already bought open on Deriv. Start on a Demo account.'
-                    )}
-                </p>
+                    <p className='bulk-strategy-modal__disclaimer' data-testid='dt_bulk_disclaimer'>
+                        {localize(
+                            'No strategy changes the odds. The entry filter only looks at past ticks, and martingale makes losses bigger. Stop leaves contracts already bought open on Deriv. Start on a Demo account.'
+                        )}
+                    </p>
+                </div>
+                <div className='bulk-strategy-modal__run-bar' data-testid='dt_bulk_run_bar'>
+                    <button
+                        type='button'
+                        className='bulk-strategy-modal__run-button'
+                        data-testid='dt_bulk_run'
+                        disabled={action_disabled}
+                        onClick={handleAction}
+                    >
+                        {action_label}
+                    </button>
+                </div>
             </div>
         </Dialog>
     );

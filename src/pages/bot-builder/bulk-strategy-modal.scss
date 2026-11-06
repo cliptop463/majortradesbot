@@ -1,15 +1,70 @@
 // Bulk Strategy modal. Uses the app's CSS variables so it follows light and dark themes.
 
 .bulk-strategy-modal {
+    .dc-dialog__dialog {
+        height: 90vh;
+        max-height: 90vh;
+        min-height: 0;
+        justify-content: flex-start;
+        align-items: stretch;
+    }
+
+    .dc-dialog__content {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        max-width: 100%;
+        margin-bottom: 0.8rem;
+    }
+
+    .dc-dialog__footer {
+        flex: none;
+    }
+
+    &__layout {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        min-height: 0;
+        width: 100%;
+    }
+
     &__content {
+        flex: 1;
+        min-height: 0;
         width: 100%;
         max-width: 100%;
-        max-height: 62vh;
+        max-height: none;
         overflow-x: hidden;
         overflow-y: auto; // the whole panel scrolls on small screens
         padding: 0.4rem 0.8rem;
         color: var(--text-prominent);
         -webkit-overflow-scrolling: touch;
+    }
+
+    &__run-bar {
+        flex: none;
+        padding: 0.8rem;
+        border-top: 1px solid var(--border-normal);
+        background: var(--general-main-2);
+    }
+
+    &__run-button {
+        width: 100%;
+        min-height: 4.4rem;
+        padding: 0.6rem 1.6rem;
+        border: 0;
+        border-radius: 0.4rem;
+        background: var(--button-primary-default);
+        color: var(--text-colored-background, #fff);
+        font-size: 1.4rem;
+        font-weight: 600;
+        cursor: pointer;
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     }
 
     &__section {

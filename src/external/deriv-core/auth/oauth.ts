@@ -218,7 +218,7 @@ export async function refreshAccessToken(
     expires_in: tokenData.expires_in,
     expires_at: tokenData.expires_at ?? Math.floor(Date.now() / 1000) + tokenData.expires_in,
     scope: tokenData.scope,
-    refresh_token: tokenData.refresh_token,
+    refresh_token: tokenData.refresh_token || refreshToken,
   };
 
   storeAuthInfo(authInfo);

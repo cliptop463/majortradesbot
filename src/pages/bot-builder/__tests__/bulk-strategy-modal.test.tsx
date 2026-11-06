@@ -12,13 +12,10 @@ jest.mock('@deriv-com/translations', () => ({
 }));
 
 jest.mock('@/components/shared_ui/dialog', () => {
-    const Dialog = ({ is_visible, children, confirm_button_text, onConfirm, is_confirm_disabled, cancel_button_text, onCancel }: any) =>
+    const Dialog = ({ is_visible, children, cancel_button_text, onCancel }: any) =>
         is_visible ? (
             <div data-testid='mock-dialog'>
                 {children}
-                <button data-testid='dialog-confirm' onClick={onConfirm} disabled={is_confirm_disabled}>
-                    {confirm_button_text}
-                </button>
                 <button data-testid='dialog-cancel' onClick={onCancel}>
                     {cancel_button_text}
                 </button>
@@ -61,7 +58,7 @@ const proposals = () => api.sent.filter(r => r.proposal);
 
 const startRun = async () => {
     await act(async () => {
-        fireEvent.click(screen.getByTestId('dialog-confirm'));
+        fireEvent.click(screen.getByTestId('dt_bulk_run'));
     });
     await act(async () => {
         await flush();
@@ -89,8 +86,9 @@ describe('defaults and saved settings', () => {
         expect(screen.getByTestId('dt_bulk_trade_anyway').checked).toBe(false);
         expect(screen.getByTestId('dt_bulk_worst_case').textContent).toContain('7.35'); // 3 x 0.35 x (1+2+4)
         expect(screen.queryByTestId('dt_bulk_problems')).toBeNull();
-        expect(screen.getByTestId('dialog-confirm').disabled).toBe(false);
-        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Run Paper strategy');
+        expect(screen.getByTestId('dt_bulk_run').disabled).toBe(false);
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run Paper strategy');
+        expect(screen.getByTestId('dt_bulk_run_bar')).toBeTruthy();
         expect(screen.getByTestId('dt_bulk_setup').textContent).toContain('saved automatically when you start');
         expect(screen.getByTestId('dt_bulk_disclaimer').textContent).toContain('No strategy changes the odds');
     });
@@ -109,7 +107,7 @@ describe('defaults and saved settings', () => {
         expect(screen.getByTestId('dt_bulk_stake').value).toBe('2.5');
         expect(screen.getByTestId('dt_bulk_mode_live').getAttribute('aria-pressed')).toBe('true');
         expect(screen.getByTestId('dt_bulk_account_demo').getAttribute('aria-pressed')).toBe('true');
-        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Run Live strategy');
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run Live strategy');
     });
 
     it('saves to localStorage, with no secrets in it', () => {
@@ -141,11 +139,11 @@ describe('risk presets and the safety cap', () => {
         expect(screen.getByTestId('dt_bulk_maxSteps').value).toBe('3');
         expect(screen.getByTestId('dt_bulk_worst_case').textContent).toContain('26.25');
         expect(screen.getByTestId('dt_bulk_problems').textContent).toContain('exceeds your max loss');
-        expect(screen.getByTestId('dialog-confirm').disabled).toBe(true);
+        expect(screen.getByTestId('dt_bulk_run').disabled).toBe(true);
 
         field('maxLoss', '30');
         expect(screen.queryByTestId('dt_bulk_problems')).toBeNull();
-        expect(screen.getByTestId('dialog-confirm').disabled).toBe(false);
+        expect(screen.getByTestId('dt_bulk_run').disabled).toBe(false);
     });
 
     it('explains the blocked Run button and offers an explicit max-loss adjustment', () => {
@@ -156,13 +154,13 @@ describe('risk presets and the safety cap', () => {
 
         expect(screen.getByTestId('dt_bulk_worst_case').textContent).toContain('75.00');
         expect(screen.getByTestId('dt_bulk_limit_help').textContent).toContain('Run is blocked');
-        expect(screen.getByTestId('dialog-confirm').disabled).toBe(true);
+        expect(screen.getByTestId('dt_bulk_run').disabled).toBe(true);
 
         fireEvent.click(screen.getByTestId('dt_bulk_set_max_loss'));
 
         expect(screen.getByTestId('dt_bulk_maxLoss').value).toBe('75');
         expect(screen.queryByTestId('dt_bulk_limit_help')).toBeNull();
-        expect(screen.getByTestId('dialog-confirm').disabled).toBe(false);
+        expect(screen.getByTestId('dt_bulk_run').disabled).toBe(false);
     });
 
     it('Low turns martingale off and hides its fields', () => {
@@ -176,7 +174,7 @@ describe('risk presets and the safety cap', () => {
         render(<BulkStrategyModal {...props()} />);
         field('bulkSize', '11');
         expect(screen.getByTestId('dt_bulk_problems').textContent).toContain('Bulk size');
-        expect(screen.getByTestId('dialog-confirm').disabled).toBe(true);
+        expect(screen.getByTestId('dt_bulk_run').disabled).toBe(true);
     });
 });
 
@@ -242,7 +240,7 @@ describe('running', () => {
         await startRun();
 
         expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toMatchObject({ stake: 0.5, mode: 'paper' });
-        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Stop');
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Stop');
         await act(async () => {
             fireEvent.click(screen.getByTestId('dt_bulk_stop'));
             await flush();
@@ -336,7 +334,7 @@ describe('running', () => {
         render(<BulkStrategyModal {...props()} />);
         await startRun();
         expect(screen.getByTestId('dt_bulk_error').textContent).toContain('Symbol is invalid.');
-        expect(screen.getByTestId('dialog-confirm').textContent).toBe('Run Paper strategy');
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run Paper strategy');
     });
 
     it('stops and cancels subscriptions when the page is left', async () => {
