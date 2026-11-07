@@ -51,6 +51,15 @@ const scriptApi = () => {
 const save = (patch: Record<string, unknown>) =>
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ stake: 1, bulkSize: 2, maxLoss: 1000, profitTarget: 1000, ...patch }));
 
+
+// Settings are hidden until asked for, so the settings tests open them first.
+const renderOpen = (ui: React.ReactElement) => {
+    const result = render(ui);
+    const toggle = screen.queryByTestId('dt_bulk_toggle_settings');
+    if (toggle) fireEvent.click(toggle);
+    return result;
+};
+
 const props = (extra = {}) => ({ isOpen: true, onClose: jest.fn(), is_running: false, onRunningChange: jest.fn(), ...extra });
 const field = (name: string, value: string) => fireEvent.change(screen.getByTestId(`dt_bulk_${name}`), { target: { value } });
 const buys = () => api.sent.filter(r => r.buy);
@@ -80,7 +89,7 @@ beforeEach(() => {
 
 describe('defaults and saved settings', () => {
     it('opens on Demo + Paper, with the trade-anyway timeout off and a worst-case cost shown', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         expect(screen.getByTestId('dt_bulk_account_demo').getAttribute('aria-pressed')).toBe('true');
         expect(screen.getByTestId('dt_bulk_mode_paper').getAttribute('aria-pressed')).toBe('true');
         expect(screen.getByTestId('dt_bulk_trade_anyway').checked).toBe(false);
@@ -94,7 +103,7 @@ describe('defaults and saved settings', () => {
     });
 
     it('offers the volatility indices and the pluggable strategy list', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         const markets = Array.from(screen.getByTestId('dt_bulk_market').options).map(o => o.value);
         expect(markets).toEqual(expect.arrayContaining(['R_100', '1HZ100V']));
         expect(Array.from(screen.getByTestId('dt_bulk_strategy').options).map(o => o.textContent)).toEqual(['Tick Striker']);
@@ -102,7 +111,7 @@ describe('defaults and saved settings', () => {
 
     it('reloads the saved config on load, but never restores Real', () => {
         save({ symbol: '1HZ50V', stake: 2.5, mode: 'live', account: 'real' });
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         expect(screen.getByTestId('dt_bulk_market').value).toBe('1HZ50V');
         expect(screen.getByTestId('dt_bulk_stake').value).toBe('2.5');
         expect(screen.getByTestId('dt_bulk_mode_live').getAttribute('aria-pressed')).toBe('true');
@@ -111,7 +120,7 @@ describe('defaults and saved settings', () => {
     });
 
     it('saves to localStorage, with no secrets in it', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         field('stake', '1.5');
         fireEvent.change(screen.getByTestId('dt_bulk_market'), { target: { value: 'R_50' } });
         fireEvent.click(screen.getByTestId('dt_bulk_save'));
@@ -122,7 +131,7 @@ describe('defaults and saved settings', () => {
     });
 
     it('lets you type decimals without the field fighting you', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         field('stake', '0.');
         expect(screen.getByTestId('dt_bulk_stake').value).toBe('0.');
         field('stake', '0.5');
@@ -132,7 +141,7 @@ describe('defaults and saved settings', () => {
 
 describe('risk presets and the safety cap', () => {
     it('High fills x2 with 3 steps and is blocked until the max loss covers the worst case', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_risk_high'));
         expect(screen.getByTestId('dt_bulk_bulkSize').value).toBe('5');
         expect(screen.getByTestId('dt_bulk_multiplier').value).toBe('2');
@@ -147,7 +156,7 @@ describe('risk presets and the safety cap', () => {
     });
 
     it('explains the blocked Run button and offers an explicit max-loss adjustment', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_risk_high'));
         field('stake', '1');
         field('maxLoss', '50');
@@ -164,14 +173,14 @@ describe('risk presets and the safety cap', () => {
     });
 
     it('Low turns martingale off and hides its fields', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_risk_low'));
         expect(screen.getByTestId('dt_bulk_martingale').checked).toBe(false);
         expect(screen.queryByTestId('dt_bulk_multiplier')).toBeNull();
     });
 
     it('rejects an out-of-range bulk size', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         field('bulkSize', '11');
         expect(screen.getByTestId('dt_bulk_problems').textContent).toContain('Bulk size');
         expect(screen.getByTestId('dt_bulk_run').disabled).toBe(true);
@@ -180,7 +189,7 @@ describe('risk presets and the safety cap', () => {
 
 describe('Real account confirmation', () => {
     it('stays on Demo until the confirmation is acknowledged', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_account_real'));
         expect(screen.getByTestId('dt_bulk_real_confirm')).toBeTruthy();
         expect(screen.getByTestId('dt_bulk_account_demo').getAttribute('aria-pressed')).toBe('true');
@@ -193,7 +202,7 @@ describe('Real account confirmation', () => {
     });
 
     it('Keep Demo cancels without enabling Real', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_account_real'));
         fireEvent.click(screen.getByTestId('dt_bulk_real_ack'));
         fireEvent.click(screen.getByTestId('dt_bulk_real_cancel'));
@@ -202,7 +211,7 @@ describe('Real account confirmation', () => {
     });
 
     it('shows a clear banner for Real + Live', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_account_real'));
         fireEvent.click(screen.getByTestId('dt_bulk_real_ack'));
         fireEvent.click(screen.getByTestId('dt_bulk_real_enable'));
@@ -211,7 +220,7 @@ describe('Real account confirmation', () => {
     });
 
     it('Live refuses to start when the logged-in account is not the one chosen', async () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_account_real'));
         fireEvent.click(screen.getByTestId('dt_bulk_real_ack'));
         fireEvent.click(screen.getByTestId('dt_bulk_real_enable'));
@@ -223,7 +232,7 @@ describe('Real account confirmation', () => {
 
     it('Live needs a logged-in account', async () => {
         (getAccountContext as jest.Mock).mockReturnValue({ kind: null, currency: 'USD' });
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         fireEvent.click(screen.getByTestId('dt_bulk_mode_live'));
         await startRun();
         expect(screen.getByTestId('dt_bulk_error').textContent).toContain('Log in first');
@@ -233,7 +242,7 @@ describe('Real account confirmation', () => {
 
 describe('running', () => {
     it('starts with edited settings without requiring a separate save', async () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         field('stake', '0.5');
         expect(screen.getByTestId('dt_bulk_save').textContent).toBe('Save');
 
@@ -250,7 +259,7 @@ describe('running', () => {
     it('Paper: sends no buy orders, fills the log table from real ticks and stops cleanly', async () => {
         save({});
         const p = props();
-        render(<BulkStrategyModal {...p} />);
+        renderOpen(<BulkStrategyModal {...p} />);
         await startRun();
         expect(p.onRunningChange).toHaveBeenLastCalledWith(true);
         expect(screen.getByTestId('dt_bulk_status').textContent).toContain('Paper');
@@ -279,7 +288,7 @@ describe('running', () => {
 
     it('stops by itself at the profit target and shows the summary with the reason', async () => {
         save({ profitTarget: 5 });
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         await startRun();
         await feed(WIN);
         await waitFor(() => expect(screen.getByTestId('dt_bulk_summary')).toBeTruthy());
@@ -289,7 +298,7 @@ describe('running', () => {
 
     it('shows a losing round in the table and counts it in the summary', async () => {
         save({});
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         await startRun();
         await feed(LOSS);
         const rows = screen.getAllByTestId('dt_bulk_log_row');
@@ -307,7 +316,7 @@ describe('running', () => {
 
     it('Live: places real buys and locks the settings while running', async () => {
         save({ mode: 'live', bulkSize: 3 });
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         await startRun();
         expect(buys()).toHaveLength(3);
         expect(buys()[0].parameters).toMatchObject({ contract_type: 'TICKHIGH', selected_tick: 5, currency: 'USD' });
@@ -322,7 +331,7 @@ describe('running', () => {
     });
 
     it('will not start beside a running Blockly bot', async () => {
-        render(<BulkStrategyModal {...props({ is_running: true })} />);
+        renderOpen(<BulkStrategyModal {...props({ is_running: true })} />);
         await startRun();
         expect(screen.getByTestId('dt_bulk_error').textContent).toContain('Stop the Blockly bot first');
         expect(api.sent).toHaveLength(0);
@@ -331,7 +340,7 @@ describe('running', () => {
     it('shows the engine error when the subscription fails, and can try again', async () => {
         save({});
         api.responders.unshift(req => (req.ticks_history ? { error: { code: 'InvalidSymbol', message: 'Symbol is invalid.' } } : undefined));
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         await startRun();
         expect(screen.getByTestId('dt_bulk_error').textContent).toContain('Symbol is invalid.');
         expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run Paper strategy');
@@ -339,7 +348,7 @@ describe('running', () => {
 
     it('stops and cancels subscriptions when the page is left', async () => {
         save({});
-        const { unmount } = render(<BulkStrategyModal {...props()} />);
+        const { unmount } = renderOpen(<BulkStrategyModal {...props()} />);
         await startRun();
         unmount();
         await act(async () => {
@@ -352,7 +361,7 @@ describe('running', () => {
     it('Hide keeps it running; the panel can be closed without stopping', async () => {
         save({});
         const p = props();
-        render(<BulkStrategyModal {...p} />);
+        renderOpen(<BulkStrategyModal {...p} />);
         await startRun();
         expect(screen.getByTestId('dialog-cancel').textContent).toBe('Hide');
         fireEvent.click(screen.getByTestId('dialog-cancel'));
@@ -373,7 +382,7 @@ describe('CSV export and scrolling holders', () => {
             return 'blob:test';
         });
         (URL as any).revokeObjectURL = jest.fn();
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         await startRun();
         await feed(WIN);
         fireEvent.click(screen.getByTestId('dt_bulk_export'));
@@ -393,7 +402,7 @@ describe('CSV export and scrolling holders', () => {
     });
 
     it('keeps the buttons in a dedicated holder that can scroll', () => {
-        render(<BulkStrategyModal {...props()} />);
+        renderOpen(<BulkStrategyModal {...props()} />);
         const holder = screen.getByTestId('dt_bulk_actions');
         expect(holder.className).toContain('bulk-strategy-modal__actions');
         expect(holder.querySelectorAll('button').length).toBeGreaterThanOrEqual(3);
@@ -401,7 +410,157 @@ describe('CSV export and scrolling holders', () => {
     });
 
     it('renders nothing when closed', () => {
-        render(<BulkStrategyModal {...props({ isOpen: false })} />);
+        renderOpen(<BulkStrategyModal {...props({ isOpen: false })} />);
         expect(screen.queryByTestId('dt_bulk_modal')).toBeNull();
     });
 });
+
+
+describe('quick test (the simple path)', () => {
+    it('opens with the settings hidden and a single obvious button', () => {
+        render(<BulkStrategyModal {...props()} />);
+        expect(screen.getByTestId('dt_bulk_quick')).toBeTruthy();
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run quick test');
+        expect(screen.getByTestId('dt_bulk_run').disabled).toBe(false);
+        expect(screen.queryByTestId('dt_bulk_stake')).toBeNull();
+        expect(screen.queryByTestId('dt_bulk_risk_high')).toBeNull();
+        expect(screen.getByTestId('dt_bulk_setup').textContent).toContain('places no orders');
+    });
+
+    it('runs with one tap: Paper, no buy orders, real quote, and stops itself after 5 rounds', async () => {
+        render(<BulkStrategyModal {...props()} />);
+        await startQuick();
+        expect(proposals()[0]).toMatchObject({ contract_type: 'TICKHIGH', selected_tick: 5, underlying_symbol: 'R_100', amount: 1 });
+        for (let i = 0; i < 5; i++) {
+            await feed(WIN);
+        }
+        await waitFor(() => expect(screen.getByTestId('dt_bulk_summary')).toBeTruthy());
+        expect(buys()).toHaveLength(0);
+        expect(screen.getAllByTestId('dt_bulk_log_row')).toHaveLength(5);
+        expect(screen.getByTestId('dt_bulk_sum_rounds').textContent).toBe('5');
+        expect(screen.getByTestId('dt_bulk_sum_reason').textContent).toBe('Finished 5 rounds.');
+        expect(api.sent.filter(r => r.forget === 'tick-sub')).toHaveLength(1);
+    });
+
+    it('uses the market you pick on the quick card', async () => {
+        render(<BulkStrategyModal {...props()} />);
+        fireEvent.change(screen.getByTestId('dt_bulk_quick_market'), { target: { value: '1HZ50V' } });
+        await startQuick();
+        expect(api.sent.find(r => r.ticks_history).ticks_history).toBe('1HZ50V');
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_run'));
+            await flush();
+        });
+    });
+
+    it('is never blocked by a bad or half-edited setup in the settings', async () => {
+        save({ stake: 5, bulkSize: 10, maxLoss: 1, mode: 'live' }); // would be refused: worst case far above max loss
+        render(<BulkStrategyModal {...props()} />);
+        await startQuick();
+        expect(screen.queryByTestId('dt_bulk_error')).toBeNull();
+        expect(proposals().length).toBeGreaterThanOrEqual(1);
+        expect(buys()).toHaveLength(0); // still Paper, whatever was saved
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_run'));
+            await flush();
+        });
+    });
+
+    it('never overwrites the settings you saved', async () => {
+        save({ stake: 2.5, symbol: 'R_75' });
+        const before = localStorage.getItem(STORAGE_KEY);
+        render(<BulkStrategyModal {...props()} />);
+        await startQuick();
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_run'));
+            await flush();
+        });
+        expect(localStorage.getItem(STORAGE_KEY)).toBe(before);
+    });
+
+    it('tells you in plain words what it is doing while it waits for ticks', async () => {
+        api.responders.unshift(req => (req.ticks_history && req.subscribe ? { history: { prices: rising(10) }, subscription: { id: 'tick-sub' } } : undefined));
+        render(<BulkStrategyModal {...props()} />);
+        await startQuick();
+        expect(screen.getByTestId('dt_bulk_status_text').textContent).toContain('Collecting real ticks (10/18)');
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_run'));
+            await flush();
+        });
+    });
+
+    it('says what the signal is when it is waiting for one', async () => {
+        const falling = Array.from({ length: 40 }, (_, i) => 200 - i);
+        api.responders.unshift(req => (req.ticks_history && req.subscribe ? { history: { prices: falling }, subscription: { id: 'tick-sub' } } : undefined));
+        render(<BulkStrategyModal {...props()} />);
+        await startQuick();
+        const text = screen.getByTestId('dt_bulk_status_text').textContent;
+        expect(text).toContain('Waiting for a signal: confidence 0.00 (needs 0.50)');
+        expect(text).toContain('5 s timeout'); // the quick test turns the timeout on so something visibly happens
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_run'));
+            await flush();
+        });
+    });
+
+    it('shows the round in progress while it settles', async () => {
+        render(<BulkStrategyModal {...props()} />);
+        await startQuick();
+        expect(screen.getByTestId('dt_bulk_status_text').textContent).toContain('Round 1 running');
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_run'));
+            await flush();
+        });
+    });
+
+    it('shows a clear error, and stays usable, when Deriv gives no usable data', async () => {
+        api.responders.unshift(req => (req.ticks_history ? { error: { code: 'WrongResponse', message: 'Deriv is not responding.' } } : undefined));
+        render(<BulkStrategyModal {...props()} />);
+        await startQuick();
+        expect(screen.getByTestId('dt_bulk_error').textContent).toContain('Deriv is not responding.');
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run quick test');
+        expect(screen.getByTestId('dt_bulk_run').disabled).toBe(false);
+    });
+
+    it('Show settings reveals every setting, relabels the button, and Reset restores the defaults', async () => {
+        save({ stake: 9, symbol: '1HZ25V' });
+        render(<BulkStrategyModal {...props()} />);
+        fireEvent.click(screen.getByTestId('dt_bulk_toggle_settings'));
+        expect(screen.getByTestId('dt_bulk_stake').value).toBe('9');
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run Paper strategy');
+        expect(screen.queryByTestId('dt_bulk_quick_market')).toBeNull();
+        fireEvent.click(screen.getByTestId('dt_bulk_reset'));
+        expect(screen.getByTestId('dt_bulk_stake').value).toBe('0.35');
+        expect(screen.getByTestId('dt_bulk_market').value).toBe('R_100');
+        expect(screen.getByTestId('dt_bulk_account_demo').getAttribute('aria-pressed')).toBe('true');
+        fireEvent.click(screen.getByTestId('dt_bulk_toggle_settings'));
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run quick test');
+    });
+
+    it('cannot change the view or the market while a run is active', async () => {
+        render(<BulkStrategyModal {...props()} />);
+        await startQuick();
+        expect(screen.getByTestId('dt_bulk_toggle_settings').disabled).toBe(true);
+        expect(screen.getByTestId('dt_bulk_quick_market').disabled).toBe(true);
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_run'));
+            await flush();
+        });
+    });
+
+    it('will not start beside a running Blockly bot, and says so', async () => {
+        render(<BulkStrategyModal {...props({ is_running: true })} />);
+        await startQuick();
+        expect(screen.getByTestId('dt_bulk_error').textContent).toContain('Stop the Blockly bot first');
+        expect(api.sent).toHaveLength(0);
+    });
+});
+
+async function startQuick() {
+    await act(async () => {
+        fireEvent.click(screen.getByTestId('dt_bulk_run'));
+    });
+    await act(async () => {
+        await flush();
+    });
+}

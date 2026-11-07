@@ -4,10 +4,13 @@ import Dialog from '@/components/shared_ui/dialog';
 import { localize } from '@deriv-com/translations';
 import { volatilityName } from '@/utils/digit-scanner/matches-differs';
 import {
+    DEFAULT_CONFIG,
     MARKETS,
+    QUICK_ROUNDS,
     TRADE_ANYWAY_MS,
     applyRiskPreset,
     loadConfig,
+    quickConfig,
     saveConfig,
     validateConfig,
     worstCaseCost,
@@ -75,6 +78,11 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
     const [real_confirm_open, setRealConfirmOpen] = React.useState(false);
     const [real_ack, setRealAck] = React.useState(false);
     const [account_kind, setAccountKind] = React.useState<AccountKind | null>(null);
+
+    // The simple path comes first: settings stay hidden until asked for.
+    const [show_settings, setShowSettings] = React.useState(false);
+    const [quick_symbol, setQuickSymbol] = React.useState(() => loadConfig().symbol);
+    const [running_config, setRunningConfig] = React.useState<BulkConfig | null>(null);
 
     const engine = React.useRef<BulkEngine | null>(null);
     const is_mounted = React.useRef(true);
@@ -159,28 +167,30 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
         else setErrorMsg(localize('Settings could not be saved in this browser.'));
     };
 
-    const start = async () => {
+    const start = async (override?: BulkConfig) => {
         if (is_active) return;
         setErrorMsg('');
+        const run_config: BulkConfig = override ?? config;
+        const run_problems = override ? validateConfig(override) : problems;
         if (is_running) {
             setErrorMsg(localize('Stop the Blockly bot first. Bulk Strategy will not run beside it.'));
             return;
         }
-        if (problems.length > 0) {
-            setErrorMsg(problems[0]);
+        if (run_problems.length > 0) {
+            setErrorMsg(run_problems[0]);
             return;
         }
         const context = getAccountContext();
         setAccountKind(context.kind);
-        if (config.mode === 'live') {
+        if (run_config.mode === 'live') {
             if (!context.kind) {
                 setErrorMsg(localize('Log in first: Live mode needs an authorized account.'));
                 return;
             }
-            if (context.kind !== config.account) {
+            if (context.kind !== run_config.account) {
                 setErrorMsg(
                     localize('You chose a {{chosen}} account but the app is logged in to a {{active}} account. Switch account in the app, then try again.', {
-                        chosen: config.account === 'real' ? localize('Real') : localize('Demo'),
+                        chosen: run_config.account === 'real' ? localize('Real') : localize('Demo'),
                         active: context.kind === 'real' ? localize('Real') : localize('Demo'),
                     })
                 );
@@ -188,18 +198,22 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
             }
         }
 
-        const config_saved = saveConfig(config);
-        setSaved(config_saved);
-        if (!config_saved) {
-            setErrorMsg(localize('Settings could not be saved in this browser. This run will still use the current settings.'));
+        if (!override) {
+            // The quick test never overwrites the settings you saved.
+            const config_saved = saveConfig(run_config);
+            setSaved(config_saved);
+            if (!config_saved) {
+                setErrorMsg(localize('Settings could not be saved in this browser. This run will still use the current settings.'));
+            }
         }
+        setRunningConfig(run_config);
         setLogs([]);
         setSummary(null);
         setTickInfo(null);
         setRunState('starting');
 
         const instance = new BulkEngine(
-            config,
+            run_config,
             createDerivApi(),
             {
                 onStatus: s => is_mounted.current && setEngineStatus(s),
@@ -233,21 +247,56 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
         await engine.current.stop();
     };
 
-    const action_label =
-        run_state === 'running' || run_state === 'stopping'
-            ? run_state === 'stopping'
-                ? localize('Stopping…')
-                : localize('Stop')
+    const startQuick = () => start(quickConfig(quick_symbol));
+    const resetToDefaults = () => {
+        if (is_active) return;
+        const fresh = { ...DEFAULT_CONFIG, martingale: { ...DEFAULT_CONFIG.martingale } };
+        setBase(fresh);
+        setText(toText(fresh));
+        setRealConfirmOpen(false);
+        setRealAck(false);
+        setSaved(false);
+        setErrorMsg('');
+    };
+
+    const is_busy = run_state === 'running' || run_state === 'stopping' || run_state === 'starting';
+    const action_label = is_busy
+        ? run_state === 'stopping'
+            ? localize('Stopping…')
             : run_state === 'starting'
               ? localize('Starting…')
-              : config.mode === 'paper'
-                ? localize('Run Paper strategy')
-                : localize('Run Live strategy');
+              : localize('Stop')
+        : !show_settings
+          ? localize('Run quick test')
+          : config.mode === 'paper'
+            ? localize('Run Paper strategy')
+            : localize('Run Live strategy');
+    // The quick test is always valid, so only the advanced path can be blocked by its settings.
     const action_disabled =
-        run_state === 'starting' ||
-        run_state === 'stopping' ||
-        (run_state === 'idle' && problems.length > 0);
-    const handleAction = () => (run_state === 'running' ? stop() : start());
+        run_state === 'starting' || run_state === 'stopping' || (run_state === 'idle' && show_settings && problems.length > 0);
+    const handleAction = () => {
+        if (run_state === 'running') return stop();
+        return show_settings ? start() : startQuick();
+    };
+
+    // Plain words for what the engine is doing right now.
+    const status_text = (() => {
+        if (run_state === 'stopping') return localize('Stopping…');
+        if (run_state === 'starting' || engine_status === 'connecting') return localize('Connecting to Deriv…');
+        if (engine_status === 'trading') {
+            return localize('Round {{n}} running: waiting for 5 real ticks to settle…', { n: logs.length + 1 });
+        }
+        if (engine_status === 'waiting') {
+            const have = tick_info?.ticks ?? 0;
+            if (have < 18) return localize('Collecting real ticks ({{have}}/18)…', { have });
+            const conf = tick_info?.confidence;
+            return localize('Waiting for a signal: confidence {{conf}} (needs 0.50){{timeout}}…', {
+                conf: conf === null || conf === undefined ? '–' : conf.toFixed(2),
+                timeout: running_config?.tradeAnywayAfterMs ? localize(', or the 5 s timeout') : '',
+            });
+        }
+        return '';
+    })();
 
     const strategy = getStrategy(base.strategyId);
     const net = logs.length ? logs[logs.length - 1].cumulative : 0;
@@ -267,12 +316,71 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
         >
             <div className='bulk-strategy-modal__layout'>
                 <div className='bulk-strategy-modal__content' data-testid='dt_bulk_modal'>
-                    <p className='bulk-strategy-modal__setup' data-testid='dt_bulk_setup'>
-                        {localize(
-                            'Choose a strategy and market, set your stake and stop limits, then start. Paper is selected by default and places no orders. Your current settings are saved automatically when you start.'
+                    <section className='bulk-strategy-modal__quick' data-testid='dt_bulk_quick'>
+                        <p className='bulk-strategy-modal__quick-title'>{localize('Try it in one tap')}</p>
+                        <p className='bulk-strategy-modal__hint' data-testid='dt_bulk_setup'>
+                            {show_settings
+                                ? localize(
+                                      'Choose a strategy and market, set your stake and stop limits, then start. Paper is selected by default and places no orders. Your current settings are saved automatically when you start.'
+                                  )
+                                : localize(
+                                      'Runs {{n}} Paper rounds on real ticks. It places no orders and uses no money. Nothing to set up.',
+                                      { n: QUICK_ROUNDS }
+                                  )}
+                        </p>
+                        {!show_settings && (
+                            <>
+                                <label className='bulk-strategy-modal__label' htmlFor='bulk-quick-market'>
+                                    {localize('Market')}
+                                </label>
+                                <select
+                                    id='bulk-quick-market'
+                                    data-testid='dt_bulk_quick_market'
+                                    className='bulk-strategy-modal__select'
+                                    value={quick_symbol}
+                                    disabled={is_busy}
+                                    onChange={e => setQuickSymbol(e.target.value)}
+                                >
+                                    {MARKETS.map(symbol => (
+                                        <option key={symbol} value={symbol}>
+                                            {`${volatilityName(symbol)} (${symbol})`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </>
                         )}
-                    </p>
+                        <div className='bulk-strategy-modal__actions'>
+                            <button
+                                type='button'
+                                className='bulk-strategy-modal__button'
+                                data-testid='dt_bulk_toggle_settings'
+                                disabled={is_busy}
+                                onClick={() => setShowSettings(v => !v)}
+                            >
+                                {show_settings ? localize('Hide settings') : localize('Show settings')}
+                            </button>
+                            {show_settings && (
+                                <button
+                                    type='button'
+                                    className='bulk-strategy-modal__button'
+                                    data-testid='dt_bulk_reset'
+                                    disabled={is_busy}
+                                    onClick={resetToDefaults}
+                                >
+                                    {localize('Reset to defaults')}
+                                </button>
+                            )}
+                        </div>
+                    </section>
 
+                    {status_text && (
+                        <p className='bulk-strategy-modal__live-status' data-testid='dt_bulk_status_text' role='status'>
+                            {status_text}
+                        </p>
+                    )}
+
+                    {show_settings && (
+                        <>
                 {/* ─── Strategy and market ─── */}
                 <section className='bulk-strategy-modal__section'>
                     <label className='bulk-strategy-modal__label' htmlFor='bulk-strategy'>
@@ -557,11 +665,16 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                     )}
                 </section>
 
+                        </>
+                    )}
+
                 {/* ─── Actions (scrolls sideways on narrow screens) ─── */}
                 <div className='bulk-strategy-modal__actions' data-testid='dt_bulk_actions'>
-                    <button type='button' className='bulk-strategy-modal__button' data-testid='dt_bulk_save' disabled={locked} onClick={handleSave}>
-                        {saved ? localize('Saved') : localize('Save')}
-                    </button>
+                    {show_settings && (
+                        <button type='button' className='bulk-strategy-modal__button' data-testid='dt_bulk_save' disabled={locked} onClick={handleSave}>
+                            {saved ? localize('Saved') : localize('Save')}
+                        </button>
+                    )}
                     <button
                         type='button'
                         className='bulk-strategy-modal__button bulk-strategy-modal__button--danger'

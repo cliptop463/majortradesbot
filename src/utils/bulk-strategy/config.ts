@@ -32,6 +32,31 @@ export const DEFAULT_CONFIG: BulkConfig = {
 
 export const TRADE_ANYWAY_MS = 5000;
 
+/** Rounds in the one-tap quick test. */
+export const QUICK_ROUNDS = 5;
+
+/**
+ * The one-tap test: Paper only (no orders, no money), Demo, one contract per round, the 5 s timeout on so
+ * something visibly happens, and it stops itself after a few rounds. It ignores the saved settings, so a bad
+ * or half-edited setup can never block it. Always valid: worst case 1.00 against a 100.00 max loss.
+ */
+export function quickConfig(symbol: string = DEFAULT_CONFIG.symbol): BulkConfig {
+    return {
+        ...DEFAULT_CONFIG,
+        symbol,
+        risk: 'low',
+        bulkSize: 1,
+        stake: 1,
+        profitTarget: 100,
+        maxLoss: 100,
+        martingale: { enabled: false, multiplier: 2, maxSteps: 2 },
+        account: 'demo',
+        mode: 'paper',
+        tradeAnywayAfterMs: TRADE_ANYWAY_MS,
+        maxRounds: QUICK_ROUNDS,
+    };
+}
+
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
 export function applyRiskPreset(config: BulkConfig, risk: Risk): BulkConfig {
@@ -81,6 +106,11 @@ export function validateConfig(config: BulkConfig): string[] {
     }
     if (config.tradeAnywayAfterMs !== null && (!isNum(config.tradeAnywayAfterMs) || config.tradeAnywayAfterMs <= 0)) {
         problems.push('The trade-anyway timeout is invalid.');
+    }
+    if (config.maxRounds !== undefined && config.maxRounds !== null) {
+        if (!Number.isInteger(config.maxRounds) || config.maxRounds < 1 || config.maxRounds > 1000) {
+            problems.push('Rounds must be a whole number from 1 to 1000.');
+        }
     }
     if (problems.length === 0) {
         const worst = worstCaseCost(config);
@@ -140,7 +170,8 @@ export function loadConfig(storage: StorageLike | null = safeStorage()): BulkCon
 export function saveConfig(config: BulkConfig, storage: StorageLike | null = safeStorage()): boolean {
     try {
         if (!storage) return false;
-        storage.setItem(STORAGE_KEY, JSON.stringify(config));
+        const { maxRounds: _quickOnly, ...persistent } = config; // the round limit belongs to the quick test only
+        storage.setItem(STORAGE_KEY, JSON.stringify(persistent));
         return true;
     } catch {
         return false;

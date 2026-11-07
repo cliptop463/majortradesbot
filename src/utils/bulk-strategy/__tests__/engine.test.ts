@@ -170,6 +170,36 @@ describe('paper mode (real ticks, no orders)', () => {
     });
 });
 
+describe('round limit (quick test)', () => {
+    it('stops by itself after maxRounds and reports why', async () => {
+        const { api, engine, rounds, stops } = setup(config({ maxRounds: 3 }));
+        await engine.start();
+        for (let i = 0; i < 3; i++) {
+            await flush();
+            feed(api, WIN);
+            await flush();
+        }
+        await flush();
+        expect(rounds).toHaveLength(3);
+        expect(proposals(api)).toHaveLength(3); // no fourth round
+        expect(stops[0].stopReason).toBe('Finished 3 rounds.');
+        expect(engine.isRunning()).toBe(false);
+    });
+
+    it('runs until stopped when no limit is set', async () => {
+        const { api, engine, rounds } = setup(config());
+        await engine.start();
+        for (let i = 0; i < 4; i++) {
+            await flush();
+            feed(api, WIN);
+            await flush();
+        }
+        expect(rounds.length).toBeGreaterThanOrEqual(4);
+        expect(engine.isRunning()).toBe(true);
+        await engine.stop();
+    });
+});
+
 describe('live mode', () => {
     const liveCfg = (patch: Partial<BulkConfig> = {}) => config({ mode: 'live', ...patch });
 

@@ -287,7 +287,9 @@ export class BulkEngine {
                 await this.playRound(signal, stake);
 
                 if (!this.running) break;
-                if (this.stats.net >= this.config.profitTarget) {
+                if (this.config.maxRounds && this.stats.rounds >= this.config.maxRounds) {
+                    this.requestStop(`Finished ${this.stats.rounds} round${this.stats.rounds === 1 ? '' : 's'}.`);
+                } else if (this.stats.net >= this.config.profitTarget) {
                     this.requestStop(`Profit target reached (${this.stats.net.toFixed(2)}).`);
                 } else if (this.stats.net <= -this.config.maxLoss) {
                     this.requestStop(`Max loss reached (${this.stats.net.toFixed(2)}).`);
@@ -315,6 +317,7 @@ export class BulkEngine {
             const check = () => {
                 const signal = this.strategy.evaluate(this.ticks);
                 this.lastConfidence = signal.confidence;
+                this.emitTick(); // show the current confidence straight away, not on the next tick
                 if (signal.trade) finish(signal);
             };
             this.cancelSignalWait = () => finish(null);

@@ -182,3 +182,33 @@ describe('saving and loading', () => {
         expect(loadConfig(memoryStorage()).martingale.multiplier).toBe(DEFAULT_CONFIG.martingale.multiplier);
     });
 });
+
+describe('quick test config', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { quickConfig, QUICK_ROUNDS } = require('../config');
+
+    it('is always valid, Paper, Demo, one contract, and stops itself after a few rounds', () => {
+        const q = quickConfig('R_50');
+        expect(validateConfig(q)).toEqual([]);
+        expect(q).toMatchObject({ symbol: 'R_50', mode: 'paper', account: 'demo', bulkSize: 1, maxRounds: QUICK_ROUNDS });
+        expect(q.martingale.enabled).toBe(false);
+        expect(q.tradeAnywayAfterMs).toBe(5000);
+    });
+
+    it('defaults to the standard market and does not depend on saved settings', () => {
+        expect(quickConfig().symbol).toBe('R_100');
+    });
+
+    it('rejects a bad round limit but allows none', () => {
+        expect(validateConfig(cfg({ maxRounds: 0 }))[0]).toContain('Rounds');
+        expect(validateConfig(cfg({ maxRounds: 2.5 }))[0]).toContain('Rounds');
+        expect(validateConfig(cfg({ maxRounds: null }))).toEqual([]);
+        expect(validateConfig(cfg({ maxRounds: 5 }))).toEqual([]);
+    });
+
+    it('does not save the round limit', () => {
+        const storage = memoryStorage();
+        saveConfig(cfg({ maxRounds: 5 }), storage);
+        expect(storage.data[STORAGE_KEY]).not.toContain('maxRounds');
+    });
+});

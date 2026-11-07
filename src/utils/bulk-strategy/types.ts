@@ -24,6 +24,8 @@ export interface BulkConfig {
     mode: RunMode;
     /** Optional "trade anyway" timeout in ms when no signal appears. null = off (default). */
     tradeAnywayAfterMs: number | null;
+    /** Optional: stop on their own after this many rounds. Not saved; used by the quick test. */
+    maxRounds?: number | null;
 }
 
 export interface ContractSpec {
