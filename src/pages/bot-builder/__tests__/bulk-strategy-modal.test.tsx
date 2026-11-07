@@ -34,12 +34,25 @@ import { createDerivApi, getAccountContext } from '@/utils/bulk-strategy/deriv-a
 const WIN = [100, 101, 102, 103, 104];
 const LOSS = [104, 103, 102, 101, 100];
 
+const trainingTicks = () => {
+    let price = 1000;
+    const ticks: number[] = [];
+    for (let block = 0; block < 41; block++) {
+        const direction = block % 2 === 0 ? 1 : -1;
+        for (let index = 0; index < 30; index++) {
+            price += direction;
+            ticks.push(price);
+        }
+    }
+    return ticks.slice(-1200);
+};
+
 let api: FakeApi;
 const scriptApi = () => {
     api = new FakeApi();
     let id = 1000;
     api.responders.push(req => {
-        if (req.ticks_history && req.subscribe) return { history: { prices: rising(30) }, subscription: { id: 'tick-sub' } };
+        if (req.ticks_history && req.subscribe) return { history: { prices: trainingTicks() }, subscription: { id: 'tick-sub' } };
         if (req.proposal) return { proposal: { payout: 3.5 * req.amount, ask_price: req.amount } };
         if (req.buy) return { buy: { contract_id: ++id, buy_price: req.price, payout: 3.5 * req.price } };
         if (req.proposal_open_contract) return { subscription: { id: `poc-${req.contract_id}` }, proposal_open_contract: { contract_id: req.contract_id, is_sold: 0 } };
@@ -106,7 +119,7 @@ describe('defaults and saved settings', () => {
         renderOpen(<BulkStrategyModal {...props()} />);
         const markets = Array.from(screen.getByTestId('dt_bulk_market').options).map(o => o.value);
         expect(markets).toEqual(expect.arrayContaining(['R_100', '1HZ100V']));
-        expect(Array.from(screen.getByTestId('dt_bulk_strategy').options).map(o => o.textContent)).toEqual(['Tick Striker']);
+        expect(Array.from(screen.getByTestId('dt_bulk_strategy').options).map(o => o.textContent)).toEqual(['Tick Striker V3']);
     });
 
     it('reloads the saved config on load, but never restores Real', () => {
@@ -427,18 +440,18 @@ describe('quick test (the simple path)', () => {
         expect(screen.getByTestId('dt_bulk_setup').textContent).toContain('places no orders');
     });
 
-    it('runs with one tap: Paper, no buy orders, real quote, and stops itself after 5 rounds', async () => {
+    it('runs with one tap: Paper, no buy orders, and settles from the real tick stream', async () => {
         render(<BulkStrategyModal {...props()} />);
         await startQuick();
         expect(proposals()[0]).toMatchObject({ contract_type: 'TICKHIGH', selected_tick: 5, underlying_symbol: 'R_100', amount: 1 });
-        for (let i = 0; i < 5; i++) {
-            await feed(WIN);
-        }
-        await waitFor(() => expect(screen.getByTestId('dt_bulk_summary')).toBeTruthy());
+        await feed(WIN);
+        expect(screen.getAllByTestId('dt_bulk_log_row')).toHaveLength(1);
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('dt_bulk_stop'));
+            await flush();
+        });
         expect(buys()).toHaveLength(0);
-        expect(screen.getAllByTestId('dt_bulk_log_row')).toHaveLength(5);
-        expect(screen.getByTestId('dt_bulk_sum_rounds').textContent).toBe('5');
-        expect(screen.getByTestId('dt_bulk_sum_reason').textContent).toBe('Finished 5 rounds.');
+        expect(screen.getByTestId('dt_bulk_sum_rounds').textContent).toBe('1');
         expect(api.sent.filter(r => r.forget === 'tick-sub')).toHaveLength(1);
     });
 
@@ -482,7 +495,7 @@ describe('quick test (the simple path)', () => {
         api.responders.unshift(req => (req.ticks_history && req.subscribe ? { history: { prices: rising(10) }, subscription: { id: 'tick-sub' } } : undefined));
         render(<BulkStrategyModal {...props()} />);
         await startQuick();
-        expect(screen.getByTestId('dt_bulk_status_text').textContent).toContain('Collecting real ticks (10/18)');
+        expect(screen.getByTestId('dt_bulk_status_text').textContent).toContain('Collecting real ticks (10/300)');
         await act(async () => {
             fireEvent.click(screen.getByTestId('dt_bulk_run'));
             await flush();
@@ -490,12 +503,12 @@ describe('quick test (the simple path)', () => {
     });
 
     it('says what the signal is when it is waiting for one', async () => {
-        const falling = Array.from({ length: 40 }, (_, i) => 200 - i);
+        const falling = Array.from({ length: 300 }, (_, i) => 500 - i);
         api.responders.unshift(req => (req.ticks_history && req.subscribe ? { history: { prices: falling }, subscription: { id: 'tick-sub' } } : undefined));
         render(<BulkStrategyModal {...props()} />);
         await startQuick();
         const text = screen.getByTestId('dt_bulk_status_text').textContent;
-        expect(text).toContain('Waiting for a signal: confidence 0.00 (needs 0.50)');
+        expect(text).toContain('Waiting for a signal: model score – (uncalibrated; needs 0.50)');
         expect(text).toContain('5 s timeout'); // the quick test turns the timeout on so something visibly happens
         await act(async () => {
             fireEvent.click(screen.getByTestId('dt_bulk_run'));

@@ -37,7 +37,8 @@ export interface ContractSpec {
 
 export interface SignalResult {
     trade: boolean;
-    confidence: number;
+    /** A strategy score; null means the strategy cannot score the available data yet. */
+    score: number | null;
     reason: string;
 }
 
@@ -83,7 +84,8 @@ export interface RoundLog {
     interrupted: number;
     net: number;
     cumulative: number;
-    confidence: number;
+    /** Strategy score; null means no score was available when the round was started. */
+    score: number | null;
     note: string;
 }
 
@@ -108,7 +110,7 @@ export type EngineStatus = 'idle' | 'connecting' | 'waiting' | 'trading' | 'stop
 
 export interface EngineEvents {
     onStatus?(status: EngineStatus): void;
-    onTick?(info: { last: number; ticks: number; confidence: number | null }): void;
+    onTick?(info: { last: number; ticks: number; score: number | null }): void;
     onRound?(log: RoundLog): void;
     onStop?(summary: Summary): void;
     onError?(message: string): void;

@@ -15,7 +15,7 @@ const log = (patch: Partial<RoundLog> = {}): RoundLog => ({
     interrupted: 0,
     net: -1.05,
     cumulative: -1.05,
-    confidence: 0.61234,
+    score: 0.61234,
     note: '',
     ...patch,
 });
@@ -31,6 +31,10 @@ describe('toCsv', () => {
 
     it('is just the header when there are no rounds', () => {
         expect(toCsv([])).toBe(CSV_HEADER.join(','));
+    });
+
+    it('leaves the score empty when the strategy could not produce one', () => {
+        expect(toCsv([log({ score: null })]).split('\n')[1].split(',')[12]).toBe('');
     });
 
     it('quotes notes with commas, quotes and new lines', () => {

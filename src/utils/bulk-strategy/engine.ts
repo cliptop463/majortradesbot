@@ -61,7 +61,7 @@ export class BulkEngine {
     private status: EngineStatus = 'idle';
 
     private ticks: number[] = [];
-    private lastConfidence: number | null = null;
+    private lastScore: number | null = null;
     private tickSubId: string | null = null;
     private passiveTicks = false;
     private subs = new Set<string>();
@@ -260,7 +260,7 @@ export class BulkEngine {
         this.events.onTick?.({
             last: this.ticks[this.ticks.length - 1] ?? NaN,
             ticks: this.ticks.length,
-            confidence: this.lastConfidence,
+            score: this.lastScore,
         });
     }
 
@@ -316,8 +316,8 @@ export class BulkEngine {
             };
             const check = () => {
                 const signal = this.strategy.evaluate(this.ticks);
-                this.lastConfidence = signal.confidence;
-                this.emitTick(); // show the current confidence straight away, not on the next tick
+                this.lastScore = signal.score;
+                this.emitTick(); // show the current score straight away, not on the next tick
                 if (signal.trade) finish(signal);
             };
             this.cancelSignalWait = () => finish(null);
@@ -336,7 +336,7 @@ export class BulkEngine {
                         }
                         finish({
                             trade: true,
-                            confidence: this.lastConfidence ?? 0,
+                            score: this.lastScore,
                             reason: `No signal for ${(timeout / 1000).toFixed(0)} s: trading anyway (timeout enabled).`,
                         });
                     }, timeout);
@@ -417,7 +417,7 @@ export class BulkEngine {
             interrupted,
             net,
             cumulative: this.stats.net,
-            confidence: signal.confidence,
+            score: signal.score,
             note: notes.join(' '),
         };
         this.logs.push(log);
@@ -457,50 +457,55 @@ export class BulkEngine {
         return { outcomes, placed: ids.length, errors };
     }
 
-    // Paper: no orders. Real proposal for the real payout, then real ticks decide the result.
+    // Paper: validate the proposal first, then settle from the following real ticks.
     private async playPaper(stake: number, spec: ContractSpec): Promise<RoundOutcome> {
+        const response = await this.api.send({ proposal: 1, ...this.contractParams(stake, spec) });
+        if (!this.running) return { outcomes: [], placed: 0, errors: [] };
+
+        const payout = Number(response?.proposal?.payout);
+        const ask = Number(response?.proposal?.ask_price);
+        if (response?.error || !Number.isFinite(payout) || !Number.isFinite(ask) || payout <= 0 || ask <= 0) {
+            this.fail(response?.error?.message || 'Deriv returned no usable quote, so the paper round was not run.');
+            return { outcomes: [], placed: 0, errors: [] };
+        }
+        this.noteRatio(ask, payout);
+
         let resolveTicks: (quotes: number[] | null) => void = () => undefined;
         const collected = new Promise<number[] | null>(resolve => (resolveTicks = resolve));
-        // Entry = the next tick from now; start collecting before the (fast) proposal round trip.
         this.collector = { quotes: [], need: this.strategy.ticksToSettle, done: resolveTicks };
+        const timer = setTimeout(() => this.collector?.done(null), this.settleTimeoutMs);
+        this.timers.add(timer);
 
-        let quotes: number[] | null = null;
+        let quotes: number[] | null;
         try {
-            const response = await this.api.send({ proposal: 1, ...this.contractParams(stake, spec) });
-            const payout = Number(response?.proposal?.payout);
-            const ask = Number(response?.proposal?.ask_price);
-            if (response?.error || !Number.isFinite(payout) || !Number.isFinite(ask) || payout <= 0 || ask <= 0) {
-                this.collector = null;
-                this.fail(response?.error?.message || 'Deriv returned no usable quote, so the paper round was not run.');
-                return { outcomes: [], placed: 0, errors: [] };
-            }
-            this.noteRatio(ask, payout);
-
-            const timer = setTimeout(() => this.collector?.done(null), this.settleTimeoutMs);
-            this.timers.add(timer);
             quotes = await collected;
+        } finally {
             clearTimeout(timer);
             this.timers.delete(timer);
             this.collector = null;
-
-            if (!quotes) {
-                const interrupted: ContractOutcome[] = Array.from({ length: this.config.bulkSize }, () => ({
-                    status: 'interrupted' as const,
-                    profit: 0,
-                }));
-                return { outcomes: this.running ? interrupted : [], placed: this.running ? this.config.bulkSize : 0, errors: [] };
-            }
-
-            const won = this.strategy.settle(quotes, spec);
-            const profit = won ? round2(payout - ask) : round2(-ask);
-            const outcomes: ContractOutcome[] = Array.from({ length: this.config.bulkSize }, () => ({
-                status: won ? ('won' as const) : ('lost' as const),
-                profit,
-            }));
-            return { outcomes, placed: this.config.bulkSize, errors: [] };
-        } finally {
-            this.collector = null;
         }
+
+        if (!quotes) {
+            if (!this.running) return { outcomes: [], placed: 0, errors: [] };
+            const interrupted: ContractOutcome[] = Array.from({ length: this.config.bulkSize }, () => ({
+                status: 'interrupted' as const,
+                profit: 0,
+            }));
+            return { outcomes: interrupted, placed: this.config.bulkSize, errors: [] };
+        }
+
+        const won = this.strategy.settle(quotes, spec);
+        if (won === undefined) {
+            this.fail('Paper settlement did not receive the complete contract window.');
+            return { outcomes: [], placed: 0, errors: [] };
+        }
+
+        const profit = won ? round2(payout - ask) : round2(-ask);
+        const outcomes: ContractOutcome[] = Array.from({ length: this.config.bulkSize }, () => ({
+            status: won ? ('won' as const) : ('lost' as const),
+            profit,
+        }));
+        return { outcomes, placed: this.config.bulkSize, errors: [] };
     }
 
     private noteRatio(price: number, payout: number) {

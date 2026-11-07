@@ -72,7 +72,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
     const [engine_status, setEngineStatus] = React.useState<EngineStatus>('idle');
     const [logs, setLogs] = React.useState<RoundLog[]>([]);
     const [summary, setSummary] = React.useState<Summary | null>(null);
-    const [tick_info, setTickInfo] = React.useState<{ last: number; ticks: number; confidence: number | null } | null>(null);
+    const [tick_info, setTickInfo] = React.useState<{ last: number; ticks: number; score: number | null } | null>(null);
     const [error_msg, setErrorMsg] = React.useState('');
 
     const [real_confirm_open, setRealConfirmOpen] = React.useState(false);
@@ -279,6 +279,8 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
         return show_settings ? start() : startQuick();
     };
 
+    const strategy = getStrategy(base.strategyId);
+
     // Plain words for what the engine is doing right now.
     const status_text = (() => {
         if (run_state === 'stopping') return localize('Stopping…');
@@ -288,17 +290,17 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
         }
         if (engine_status === 'waiting') {
             const have = tick_info?.ticks ?? 0;
-            if (have < 18) return localize('Collecting real ticks ({{have}}/18)…', { have });
-            const conf = tick_info?.confidence;
-            return localize('Waiting for a signal: confidence {{conf}} (needs 0.50){{timeout}}…', {
-                conf: conf === null || conf === undefined ? '–' : conf.toFixed(2),
+            const minTicks = strategy?.minTicks ?? 0;
+            if (have < minTicks) return localize('Collecting real ticks ({{have}}/{{minimum}})…', { have, minimum: minTicks });
+            const score = tick_info?.score;
+            return localize('Waiting for a signal: model score {{score}} (uncalibrated; needs 0.50){{timeout}}…', {
+                score: score === null || score === undefined ? '–' : score.toFixed(2),
                 timeout: running_config?.tradeAnywayAfterMs ? localize(', or the 5 s timeout') : '',
             });
         }
         return '';
     })();
 
-    const strategy = getStrategy(base.strategyId);
     const net = logs.length ? logs[logs.length - 1].cumulative : 0;
     const is_real_live = config.account === 'real' && config.mode === 'live';
 
@@ -709,7 +711,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                             {tick_info && (
                                 <span>
                                     {` · ${tick_info.ticks} ${localize('ticks')} · ${localize('last')} ${tick_info.last}`}
-                                    {tick_info.confidence !== null && ` · conf ${tick_info.confidence.toFixed(2)}`}
+                                    {tick_info.score !== null && ` · score ${tick_info.score.toFixed(2)}`}
                                 </span>
                             )}
                             <span>{` · ${localize('rounds')} ${logs.length} · ${localize('net')} ${money(net)}`}</span>

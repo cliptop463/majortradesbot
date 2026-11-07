@@ -1,14 +1,14 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_CONFIG } from '../config';
 import { BulkEngine } from '../engine';
-import { tickStriker } from '../strategies/tick-striker';
+import { MIN_TICKS, tickStriker } from '../strategies/tick-striker';
 import type { BulkConfig, BulkStrategy, RoundLog, Summary } from '../types';
 import { FakeApi, falling, flush, rising, tick } from '../testing/fake-api';
 
 /** Always signals, so rounds start the moment the buffer is seeded. */
 const alwaysTrade: BulkStrategy = {
     ...tickStriker,
-    evaluate: () => ({ trade: true, confidence: 0.9, reason: 'test' }),
+    evaluate: () => ({ trade: true, score: 0.9, reason: 'test' }),
 };
 
 const config = (patch: Partial<BulkConfig> = {}): BulkConfig => ({
@@ -71,11 +71,70 @@ describe('paper mode (real ticks, no orders)', () => {
             amount: 1,
             basis: 'stake',
         });
+
         feed(api, WIN);
         await flush();
         expect(buys(api)).toHaveLength(0);
         expect(rounds).toHaveLength(1);
         expect(rounds[0]).toMatchObject({ round: 1, contracts: 2, won: 2, lost: 0, net: 5, cumulative: 5, mode: 'paper' });
+    });
+
+    it('starts collecting settlement ticks only after the proposal response arrives', async () => {
+        const { api, engine, rounds } = setup(config({ maxRounds: 1 }));
+        let resolveProposal: ((response: unknown) => void) | undefined;
+        api.responders.unshift(
+            req =>
+                req.proposal
+                    ? new Promise(resolve => {
+                          resolveProposal = resolve;
+                      })
+                    : undefined
+        );
+
+        await engine.start();
+        await flush();
+        expect(proposals(api)).toHaveLength(1);
+        expect(resolveProposal).toBeDefined();
+
+        feed(api, WIN);
+        await flush();
+        expect(rounds).toHaveLength(0);
+
+        resolveProposal?.({ proposal: { payout: 3.5, ask_price: 1 } });
+        await flush();
+        expect(rounds).toHaveLength(0);
+
+        feed(api, LOSS);
+        await flush();
+        expect(rounds).toHaveLength(1);
+        expect(rounds[0]).toMatchObject({ won: 0, lost: 2, net: -2 });
+        expect(engine.isRunning()).toBe(false);
+    });
+
+    it('marks a paper contract interrupted when the post-proposal settlement window times out', async () => {
+        const { engine, rounds, stops } = setup(config(), { settleTimeoutMs: 20 });
+        await engine.start();
+        await flush();
+        await new Promise(resolve => setTimeout(resolve, 40));
+        await flush();
+
+        expect(rounds).toHaveLength(1);
+        expect(rounds[0]).toMatchObject({ won: 0, lost: 0, interrupted: 2, net: 0 });
+        expect(stops[0].contractsInterrupted).toBe(2);
+        expect(stops[0].stopReason).toContain('could not be confirmed');
+    });
+
+    it('does not count an unavailable settlement result as a loss', async () => {
+        const strategy: BulkStrategy = { ...alwaysTrade, settle: () => undefined };
+        const { api, engine, rounds, stops, errors } = setup(config(), { strategy });
+        await engine.start();
+        await flush();
+        feed(api, WIN);
+        await flush();
+
+        expect(rounds).toHaveLength(0);
+        expect(errors[0]).toContain('complete contract window');
+        expect(stops[0].contractsLost).toBe(0);
     });
 
     it('stops at the profit target and shows a summary', async () => {
@@ -313,19 +372,16 @@ describe('live mode', () => {
 });
 
 describe('signal gating with the real Tick Striker', () => {
-    it('waits while confidence is below 0.5 and trades once it recovers', async () => {
-        const { api, engine } = setup(config({ mode: 'paper' }), { seed: falling(40), strategy: tickStriker });
+    it('does not score or trade when historical outcomes contain only one class', async () => {
+        const { api, engine } = setup(config({ mode: 'paper' }), { seed: rising(MIN_TICKS), strategy: tickStriker });
         await engine.start();
         await flush();
-        expect(proposals(api)).toHaveLength(0); // conf 0 on a falling series
-        feed(api, rising(60, 1000));
-        await flush();
-        expect(proposals(api).length).toBeGreaterThanOrEqual(1);
+        expect(proposals(api)).toHaveLength(0);
         await engine.stop();
     });
 
     it('does not trade anyway by default, even after waiting', async () => {
-        const { api, engine } = setup(config(), { seed: falling(40), strategy: tickStriker });
+        const { api, engine } = setup(config(), { seed: falling(MIN_TICKS), strategy: tickStriker });
         await engine.start();
         await new Promise(resolve => setTimeout(resolve, 80));
         expect(proposals(api)).toHaveLength(0);
@@ -333,7 +389,7 @@ describe('signal gating with the real Tick Striker', () => {
     });
 
     it('trades anyway after the optional timeout when it is switched on', async () => {
-        const { api, engine, rounds } = setup(config({ tradeAnywayAfterMs: 30 }), { seed: falling(40), strategy: tickStriker });
+        const { api, engine, rounds } = setup(config({ tradeAnywayAfterMs: 30 }), { seed: falling(MIN_TICKS), strategy: tickStriker });
         await engine.start();
         await new Promise(resolve => setTimeout(resolve, 90));
         expect(proposals(api)).toHaveLength(1);
@@ -343,7 +399,7 @@ describe('signal gating with the real Tick Striker', () => {
         await engine.stop();
     });
 
-    it('does not trade before 18 real ticks exist, even with the timeout on', async () => {
+    it('does not trade before the minimum real-tick window exists, even with the timeout on', async () => {
         const { api, engine } = setup(config({ tradeAnywayAfterMs: 20 }), { seed: falling(5), strategy: tickStriker });
         await engine.start();
         await new Promise(resolve => setTimeout(resolve, 80));

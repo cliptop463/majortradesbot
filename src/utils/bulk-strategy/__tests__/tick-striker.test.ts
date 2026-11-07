@@ -1,8 +1,32 @@
 import { describe, expect, it } from '@jest/globals';
 import { DEFAULT_CONFIG } from '../config';
 import { STRATEGIES, getStrategy, listStrategies } from '../strategies';
-import { BUFFER_SIZE, MIN_TICKS, evaluate, settle, tickStriker } from '../strategies/tick-striker';
+import {
+    BUFFER_SIZE,
+    MIN_NEGATIVE_EXAMPLES,
+    MIN_POSITIVE_EXAMPLES,
+    MIN_TICKS,
+    evaluate,
+    settle,
+    tickStriker,
+} from '../strategies/tick-striker';
 import { falling, rising } from '../testing/fake-api';
+
+const variedTicks = (count: number) =>
+    Array.from({ length: count }, (_, index) => 100 + Math.sin(index * 1.7) * 2 + Math.sin(index * 0.31) * 3);
+
+const trendingTicks = () => {
+    let price = 1000;
+    const ticks: number[] = [];
+    for (let block = 0; block < 41; block++) {
+        const direction = block % 2 === 0 ? 1 : -1;
+        for (let index = 0; index < 30; index++) {
+            price += direction;
+            ticks.push(price);
+        }
+    }
+    return ticks.slice(-BUFFER_SIZE);
+};
 
 describe('Tick Striker contract', () => {
     it('is High Tick, selected tick 5, 5 ticks', () => {
@@ -12,8 +36,9 @@ describe('Tick Striker contract', () => {
             duration_unit: 't',
             selected_tick: 5,
         });
-        expect(tickStriker.minTicks).toBe(18);
-        expect(tickStriker.bufferSize).toBe(120);
+        expect(tickStriker.minTicks).toBe(MIN_TICKS);
+        expect(tickStriker.bufferSize).toBe(BUFFER_SIZE);
+        expect(tickStriker.ticksToSettle).toBe(5);
     });
 
     it('is registered so more strategies can be added beside it', () => {
@@ -24,84 +49,84 @@ describe('Tick Striker contract', () => {
     });
 });
 
-describe('Tick Striker signal', () => {
-    it('does not trade with fewer than 18 ticks', () => {
+describe('Tick Striker model score', () => {
+    it('does not score before the minimum real-tick window is available', () => {
         const result = evaluate(rising(MIN_TICKS - 1));
         expect(result.trade).toBe(false);
-        expect(result.confidence).toBe(0);
-        expect(result.reason).toContain('Need 18');
+        expect(result.score).toBeNull();
+        expect(result.reason).toContain(`Need ${MIN_TICKS}`);
     });
 
-    it('trades on a rising series (conf 1)', () => {
-        const result = evaluate(rising(30));
-        expect(result.trade).toBe(true);
-        expect(result.confidence).toBeCloseTo(1);
-    });
-
-    it('does not trade on a falling or flat series (conf 0)', () => {
-        expect(evaluate(falling(30)).trade).toBe(false);
-        expect(evaluate(falling(30)).confidence).toBeCloseTo(0);
-        expect(evaluate(Array(30).fill(100)).confidence).toBeCloseTo(0); // equal ticks are "not up"
-    });
-
-    it('uses 0.5 for P(up | state) when the last state never occurred before', () => {
-        // 17 falling ticks then one rise: series = 16 zeros then a single 1.
-        const ticks = [...falling(17, 100), 150];
-        const result = evaluate(ticks);
-        const upRate = 1 / 17;
-        expect(result.confidence).toBeCloseTo(0.65 * 0.5 + 0.35 * upRate, 6);
+    it('does not score unless enough positive and negative outcomes are observed', () => {
+        const result = evaluate(rising(MIN_TICKS));
         expect(result.trade).toBe(false);
+        expect(result.score).toBeNull();
+        expect(result.reason).toContain(`${MIN_POSITIVE_EXAMPLES} positive`);
+        expect(result.reason).toContain(`${MIN_NEGATIVE_EXAMPLES} negative`);
     });
 
-    it('weights 0.65 conditional + 0.35 overall for an alternating series', () => {
-        // up, down, up, down ... ends on "down" (0). After a 0 the next is always 1: P(up|0) = 1.
-        const ticks = Array.from({ length: 31 }, (_, i) => (i % 2 === 0 ? 100 : 101)); // 100,101,100,...,100
-        const result = evaluate(ticks);
-        const series = ticks.slice(1).map((q, i) => (q > ticks[i] ? 1 : 0));
-        const last = series[series.length - 1];
-        let same = 0;
-        let up = 0;
-        for (let j = 0; j < series.length - 1; j++) {
-            if (series[j] === last) {
-                same++;
-                if (series[j + 1] === 1) up++;
-            }
+    it('rejects invalid quotes instead of producing a score', () => {
+        for (const invalid of [NaN, Infinity, -1, 0]) {
+            const ticks = variedTicks(MIN_TICKS);
+            ticks[150] = invalid;
+            const result = evaluate(ticks);
+            expect(result.trade).toBe(false);
+            expect(result.score).toBeNull();
+            expect(result.reason).toContain('Invalid tick data');
         }
-        const expected = 0.65 * (same ? up / same : 0.5) + 0.35 * (series.reduce((a, b) => a + b, 0) / series.length);
-        expect(result.confidence).toBeCloseTo(expected, 10);
-        expect(result.trade).toBe(expected >= 0.5);
     });
 
-    it('only looks at the last 120 ticks', () => {
-        const old = falling(80);
-        const recent = rising(BUFFER_SIZE, 1000);
-        expect(evaluate([...old, ...recent]).confidence).toBeCloseTo(evaluate(recent).confidence, 10);
+    it('trains a deterministic logistic score from both observed outcome classes', () => {
+        const ticks = variedTicks(BUFFER_SIZE);
+        const result = evaluate(ticks);
+
+        expect(result.score).not.toBeNull();
+        expect(Number.isFinite(result.score)).toBe(true);
+        expect(result.score).toBeGreaterThanOrEqual(0);
+        expect(result.score).toBeLessThanOrEqual(1);
+        expect(result.reason).toContain('Uncalibrated TICKHIGH model score');
+        expect(result.trade).toBe(result.score! >= 0.5);
+        expect(evaluate(ticks)).toEqual(result);
+    });
+
+    it('can signal when the rolling training history supports a continuation score', () => {
+        const result = evaluate(trendingTicks());
+        expect(result.score).not.toBeNull();
+        expect(result.trade).toBe(true);
+    });
+
+    it('uses only the most recent buffer of quotes', () => {
+        const recent = variedTicks(BUFFER_SIZE);
+        expect(evaluate([...falling(100), ...recent])).toEqual(evaluate(recent));
     });
 });
 
-describe('Tick Striker paper settlement (real ticks only)', () => {
+describe('Tick Striker paper settlement', () => {
     const spec = tickStriker.contract(DEFAULT_CONFIG);
 
     it('waits until all five ticks have arrived', () => {
         expect(settle([1, 2, 3, 4], spec)).toBeUndefined();
     });
 
-    it('wins when the 5th tick is the highest', () => {
+    it('wins only when the fifth tick is strictly higher than each of ticks one through four', () => {
         expect(settle([100, 101, 102, 103, 104], spec)).toBe(true);
         expect(settle([105, 99, 100, 101, 106], spec)).toBe(true);
-    });
-
-    it('loses when any earlier tick is higher', () => {
         expect(settle([100, 101, 102, 110, 104], spec)).toBe(false);
         expect(settle([110, 101, 102, 103, 104], spec)).toBe(false);
     });
 
-    it('treats a tie for highest as a loss (conservative)', () => {
+    it('treats a tie for highest or any invalid quote as a loss', () => {
         expect(settle([100, 101, 102, 104, 104], spec)).toBe(false);
         expect(settle([104, 100, 100, 100, 104], spec)).toBe(false);
+        expect(settle([100, 101, NaN, 103, 104], spec)).toBe(false);
+        expect(settle([100, 101, 0, 103, 104], spec)).toBe(false);
     });
 
-    it('ignores ticks beyond the fifth', () => {
+    it('ignores ticks beyond the five-tick contract window', () => {
         expect(settle([100, 101, 102, 103, 104, 90, 200], spec)).toBe(true);
+    });
+
+    it('rejects an invalid selected tick rather than settling a different contract', () => {
+        expect(settle([100, 101, 102, 103, 104], { ...spec, selected_tick: 6 })).toBe(false);
     });
 });
