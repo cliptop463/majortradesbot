@@ -6,9 +6,11 @@ import {
     MIN_NEGATIVE_EXAMPLES,
     MIN_POSITIVE_EXAMPLES,
     MIN_TICKS,
+    THRESHOLD,
     evaluate,
     settle,
     tickStriker,
+    walkForwardThresholdTest,
 } from '../strategies/tick-striker';
 import { falling, rising } from '../testing/fake-api';
 
@@ -55,6 +57,12 @@ describe('Tick Striker model score', () => {
         expect(result.trade).toBe(false);
         expect(result.score).toBeNull();
         expect(result.reason).toContain(`Need ${MIN_TICKS}`);
+        expect(result.diagnostics).toMatchObject({
+            tickCount: MIN_TICKS - 1,
+            modelTrained: false,
+            signalAvailable: false,
+            rejectionCode: 'insufficient_ticks',
+        });
     });
 
     it('does not score unless enough positive and negative outcomes are observed', () => {
@@ -63,6 +71,7 @@ describe('Tick Striker model score', () => {
         expect(result.score).toBeNull();
         expect(result.reason).toContain(`${MIN_POSITIVE_EXAMPLES} positive`);
         expect(result.reason).toContain(`${MIN_NEGATIVE_EXAMPLES} negative`);
+        expect(result.diagnostics?.rejectionCode).toBe('insufficient_outcomes');
     });
 
     it('rejects invalid quotes instead of producing a score', () => {
@@ -73,6 +82,7 @@ describe('Tick Striker model score', () => {
             expect(result.trade).toBe(false);
             expect(result.score).toBeNull();
             expect(result.reason).toContain('Invalid tick data');
+            expect(result.diagnostics?.rejectionCode).toBe('invalid_tick_data');
         }
     });
 
@@ -86,6 +96,15 @@ describe('Tick Striker model score', () => {
         expect(result.score).toBeLessThanOrEqual(1);
         expect(result.reason).toContain('Uncalibrated TICKHIGH model score');
         expect(result.trade).toBe(result.score! >= 0.5);
+        expect(result.diagnostics).toMatchObject({
+            tickCount: BUFFER_SIZE,
+            trainingSampleCount: expect.any(Number),
+            modelTrained: true,
+            entryThreshold: THRESHOLD,
+        });
+        expect(result.diagnostics?.positiveOutcomeRate).toBeCloseTo(
+            result.diagnostics!.positiveExamples / result.diagnostics!.trainingSampleCount
+        );
         expect(evaluate(ticks)).toEqual(result);
     });
 
@@ -93,6 +112,41 @@ describe('Tick Striker model score', () => {
         const result = evaluate(trendingTicks());
         expect(result.score).not.toBeNull();
         expect(result.trade).toBe(true);
+        expect(result.diagnostics?.signalAvailable).toBe(true);
+    });
+
+    it('triggers only at or above the specified entry threshold', () => {
+        const ticks = trendingTicks();
+        const scored = evaluate(ticks, 0);
+        expect(scored.score).not.toBeNull();
+        const score = scored.score!;
+        expect(evaluate(ticks, score).trade).toBe(true);
+        const below = evaluate(ticks, Math.min(1, score + 0.001));
+        expect(below.trade).toBe(false);
+        expect(below.diagnostics?.rejectionCode).toBe('below_threshold');
+        expect(below.diagnostics?.rejectionReason).toContain('below entry threshold');
+    });
+
+    it('walks forward chronologically, selects on validation, and reports a separate payout-aware test window', () => {
+        const ticks = trendingTicks();
+        const quotes = ticks.map((_, tickIndex) => ({ tickIndex, askPrice: 1, payout: 3.5 }));
+        const result = walkForwardThresholdTest(ticks, quotes);
+
+        expect(result.reason).toBeNull();
+        expect(result.embargoTicks).toBe(5);
+        expect(result.trainingSamples).toBeGreaterThan(0);
+        expect(result.validationSamples).toBeGreaterThan(0);
+        expect(result.outOfSampleSamples).toBeGreaterThan(0);
+        expect(result.candidateResults).toHaveLength(9);
+        expect(result.selectedThreshold).not.toBeNull();
+        expect(result.outOfSample).toMatchObject({
+            threshold: result.selectedThreshold,
+            trades: expect.any(Number),
+            signalFrequency: expect.any(Number),
+            maximumDrawdown: expect.any(Number),
+        });
+        expect(result.scoreDistribution?.min).toBeLessThanOrEqual(result.scoreDistribution!.median);
+        expect(result.scoreDistribution?.median).toBeLessThanOrEqual(result.scoreDistribution!.max);
     });
 
     it('uses only the most recent buffer of quotes', () => {

@@ -8,6 +8,8 @@ import type {
     EngineEvents,
     EngineStatus,
     RoundLog,
+    SignalDiagnostics,
+    SignalEvaluationStats,
     SignalResult,
     Summary,
 } from './types';
@@ -61,7 +63,17 @@ export class BulkEngine {
     private status: EngineStatus = 'idle';
 
     private ticks: number[] = [];
+    private ticksSeen = 0;
     private lastScore: number | null = null;
+    private lastDiagnostics: SignalDiagnostics | null = null;
+    private tickSequence = 0;
+    private lastSignaledTickSequence: number | null = null;
+    private signalStats: SignalEvaluationStats = {
+        evaluations: 0,
+        modelSignals: 0,
+        signalRate: 0,
+        rejectionsByReason: {},
+    };
     private tickSubId: string | null = null;
     private passiveTicks = false;
     private subs = new Set<string>();
@@ -88,6 +100,8 @@ export class BulkEngine {
         worstStreak: 0,
         ratioSum: 0,
         ratioCount: 0,
+        modelWon: 0,
+        modelLost: 0,
     };
 
     constructor(config: BulkConfig, api: BulkApi, events: EngineEvents = {}, options: EngineOptions = {}, strategy?: BulkStrategy) {
@@ -125,6 +139,12 @@ export class BulkEngine {
             net: round2(this.stats.net),
             worstLossStreak: this.stats.worstStreak,
             breakEvenWinRate: this.stats.ratioCount > 0 ? this.stats.ratioSum / this.stats.ratioCount : null,
+            modelContractsWon: this.stats.modelWon,
+            modelContractsLost: this.stats.modelLost,
+            modelWinRate:
+                this.stats.modelWon + this.stats.modelLost > 0
+                    ? this.stats.modelWon / (this.stats.modelWon + this.stats.modelLost)
+                    : null,
             stopReason: this.stopReason,
         };
     }
@@ -224,9 +244,13 @@ export class BulkEngine {
         const prices: unknown[] = Array.isArray(response?.history?.prices) ? response.history.prices : [];
         prices.forEach(price => {
             const quote = Number(price);
-            if (Number.isFinite(quote)) this.ticks.push(quote);
+            if (Number.isFinite(quote)) {
+                this.ticks.push(quote);
+                this.ticksSeen++;
+            }
         });
         this.ticks = this.ticks.slice(-this.strategy.bufferSize);
+        this.tickSequence = this.ticksSeen;
         this.emitTick();
     }
 
@@ -247,6 +271,8 @@ export class BulkEngine {
     private pushTick(quote: number) {
         if (!Number.isFinite(quote)) return;
         this.ticks.push(quote);
+        this.ticksSeen++;
+        this.tickSequence++;
         if (this.ticks.length > this.strategy.bufferSize) this.ticks.shift();
         if (this.collector) {
             this.collector.quotes.push(quote);
@@ -260,7 +286,13 @@ export class BulkEngine {
         this.events.onTick?.({
             last: this.ticks[this.ticks.length - 1] ?? NaN,
             ticks: this.ticks.length,
+            ticksSeen: this.ticksSeen,
             score: this.lastScore,
+            diagnostics: this.lastDiagnostics,
+            signalStats: {
+                ...this.signalStats,
+                rejectionsByReason: { ...this.signalStats.rejectionsByReason },
+            },
         });
     }
 
@@ -310,13 +342,24 @@ export class BulkEngine {
                     clearTimeout(timer);
                     this.timers.delete(timer);
                 }
+                if (signal?.trade) this.lastSignaledTickSequence = this.tickSequence;
                 this.onTickForSignal = null;
                 this.cancelSignalWait = null;
                 resolve(signal);
             };
             const check = () => {
+                if (this.lastSignaledTickSequence === this.tickSequence) return;
                 const signal = this.strategy.evaluate(this.ticks);
                 this.lastScore = signal.score;
+                this.lastDiagnostics = signal.diagnostics ?? null;
+                this.signalStats.evaluations++;
+                if (signal.trade) {
+                    this.signalStats.modelSignals++;
+                } else {
+                    const code = signal.diagnostics?.rejectionCode ?? 'strategy_rejected';
+                    this.signalStats.rejectionsByReason[code] = (this.signalStats.rejectionsByReason[code] ?? 0) + 1;
+                }
+                this.signalStats.signalRate = this.signalStats.modelSignals / this.signalStats.evaluations;
                 this.emitTick(); // show the current score straight away, not on the next tick
                 if (signal.trade) finish(signal);
             };
@@ -337,7 +380,9 @@ export class BulkEngine {
                         finish({
                             trade: true,
                             score: this.lastScore,
-                            reason: `No signal for ${(timeout / 1000).toFixed(0)} s: trading anyway (timeout enabled).`,
+                            reason: `TESTING ONLY: no model signal for ${(timeout / 1000).toFixed(0)} s; timeout entry forced.`,
+                            diagnostics: this.lastDiagnostics ?? undefined,
+                            testingOnly: true,
                         });
                     }, timeout);
                     this.timers.add(timer);
@@ -376,7 +421,7 @@ export class BulkEngine {
         const net = round2(result.outcomes.reduce((sum, o) => sum + (o.status === 'interrupted' ? 0 : o.profit), 0));
 
         const notes: string[] = [];
-        if (signal.reason.startsWith('No signal')) notes.push(signal.reason);
+        if (signal.testingOnly) notes.push(signal.reason);
         if (interrupted > 0) {
             notes.push(
                 `${interrupted} contract(s) not tracked to the end${
@@ -394,6 +439,10 @@ export class BulkEngine {
         this.stats.lost += lost;
         this.stats.interrupted += interrupted;
         this.stats.net = round2(this.stats.net + net);
+        if (!signal.testingOnly) {
+            this.stats.modelWon += won;
+            this.stats.modelLost += lost;
+        }
 
         if (interrupted === 0 && result.errors.length === 0) {
             if (net < 0) {
@@ -418,6 +467,7 @@ export class BulkEngine {
             net,
             cumulative: this.stats.net,
             score: signal.score,
+            testingOnly: signal.testingOnly ?? false,
             note: notes.join(' '),
         };
         this.logs.push(log);

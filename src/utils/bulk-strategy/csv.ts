@@ -14,6 +14,7 @@ export const CSV_HEADER = [
     'net',
     'cumulative',
     'score',
+    'testingOnly',
     'note',
 ] as const;
 
@@ -40,6 +41,7 @@ export function toCsv(logs: readonly RoundLog[]): string {
             l.net.toFixed(2),
             l.cumulative.toFixed(2),
             l.score === null ? '' : l.score.toFixed(3),
+            l.testingOnly ?? false,
             l.note,
         ]
             .map(cell)

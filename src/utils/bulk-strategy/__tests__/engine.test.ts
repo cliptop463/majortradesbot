@@ -2,7 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_CONFIG } from '../config';
 import { BulkEngine } from '../engine';
 import { MIN_TICKS, tickStriker } from '../strategies/tick-striker';
-import type { BulkConfig, BulkStrategy, RoundLog, Summary } from '../types';
+import type { BulkConfig, BulkStrategy, EngineEvents, RoundLog, Summary } from '../types';
 import { FakeApi, falling, flush, rising, tick } from '../testing/fake-api';
 
 /** Always signals, so rounds start the moment the buffer is seeded. */
@@ -25,7 +25,10 @@ const config = (patch: Partial<BulkConfig> = {}): BulkConfig => ({
 const WIN = [100, 101, 102, 103, 104];
 const LOSS = [104, 103, 102, 101, 100];
 
-function setup(cfg: BulkConfig, opts: { seed?: number[]; strategy?: BulkStrategy; settleTimeoutMs?: number } = {}) {
+function setup(
+    cfg: BulkConfig,
+    opts: { seed?: number[]; strategy?: BulkStrategy; settleTimeoutMs?: number; onTick?: EngineEvents['onTick'] } = {}
+) {
     const api = new FakeApi();
     const rounds: RoundLog[] = [];
     const stops: Summary[] = [];
@@ -45,7 +48,7 @@ function setup(cfg: BulkConfig, opts: { seed?: number[]; strategy?: BulkStrategy
     const engine = new BulkEngine(
         cfg,
         api,
-        { onRound: l => rounds.push(l), onStop: s => stops.push(s), onError: e => errors.push(e) },
+        { onRound: l => rounds.push(l), onStop: s => stops.push(s), onError: e => errors.push(e), onTick: opts.onTick },
         { currency: 'USD', settleTimeoutMs: opts.settleTimeoutMs },
         opts.strategy ?? alwaysTrade
     );
@@ -57,6 +60,85 @@ const buys = (api: FakeApi) => api.sent.filter(r => r.buy);
 const feed = (api: FakeApi, quotes: number[]) => quotes.forEach(q => tick(api, q));
 
 describe('paper mode (real ticks, no orders)', () => {
+    it('reports the current rejection diagnostics and aggregated model signal frequency', async () => {
+        const diagnostics = {
+            tickCount: 30,
+            trainingSampleCount: 0,
+            positiveExamples: 0,
+            negativeExamples: 0,
+            positiveOutcomeRate: null,
+            negativeOutcomeRate: null,
+            currentModelScore: null,
+            entryThreshold: 0.5,
+            modelTrained: false,
+            signalAvailable: false,
+            rejectionCode: 'insufficient_ticks',
+            rejectionReason: 'Need 300 ticks, have 30.',
+        };
+        const updates: Parameters<NonNullable<EngineEvents['onTick']>>[0][] = [];
+        const onTick: EngineEvents['onTick'] = info => updates.push(info);
+        const strategy: BulkStrategy = {
+            ...tickStriker,
+            evaluate: () => ({ trade: false, score: null, reason: diagnostics.rejectionReason, diagnostics }),
+        };
+        const { api, engine } = setup(config(), { strategy, onTick });
+        await engine.start();
+        await flush();
+
+        const update = updates.find(info => info.diagnostics);
+        expect(update.diagnostics).toEqual(diagnostics);
+        expect(update.signalStats).toMatchObject({
+            evaluations: 1,
+            modelSignals: 0,
+            signalRate: 0,
+            rejectionsByReason: { insufficient_ticks: 1 },
+        });
+        await engine.stop();
+        await engine.stop();
+    });
+
+    it('marks timeout-forced entries as testing-only and excludes them from model win rate', async () => {
+        const testingStrategy: BulkStrategy = {
+            ...tickStriker,
+            evaluate: () => ({
+                trade: false,
+                score: null,
+                reason: 'insufficient training data',
+                diagnostics: {
+                    tickCount: 300,
+                    trainingSampleCount: 0,
+                    positiveExamples: 0,
+                    negativeExamples: 0,
+                    positiveOutcomeRate: null,
+                    negativeOutcomeRate: null,
+                    currentModelScore: null,
+                    entryThreshold: 0.5,
+                    modelTrained: false,
+                    signalAvailable: false,
+                    rejectionCode: 'insufficient_ticks',
+                    rejectionReason: 'insufficient training data',
+                },
+            }),
+        };
+        const { api, engine, rounds } = setup(
+            config({ tradeAnywayAfterMs: 10, maxRounds: 1 }),
+            { strategy: testingStrategy, seed: rising(300) }
+        );
+        await engine.start();
+        await new Promise(resolve => setTimeout(resolve, 20));
+        feed(api, WIN);
+        await flush();
+
+        expect(rounds[0]).toMatchObject({ testingOnly: true, won: 2 });
+        expect(rounds[0].note).toContain('TESTING ONLY');
+        expect(engine.getSummary()).toMatchObject({
+            contractsWon: 2,
+            modelContractsWon: 0,
+            modelContractsLost: 0,
+            modelWinRate: null,
+        });
+    });
+
     it('never sends a buy order, only a real proposal, and settles from real ticks', async () => {
         const { api, engine, rounds } = setup(config({ profitTarget: 5 }));
         await engine.start();
@@ -275,6 +357,32 @@ describe('live mode', () => {
             buy: '1',
             price: 1,
             parameters: { contract_type: 'TICKHIGH', selected_tick: 5, duration: 5, duration_unit: 't', amount: 1, underlying_symbol: 'R_100' },
+        });
+
+        it('does not re-fire a signal for the same tick snapshot after an immediately settled round', async () => {
+            let evaluations = 0;
+            const oneSignal: BulkStrategy = {
+                ...alwaysTrade,
+                evaluate: () => {
+                    evaluations++;
+                    return { trade: true, score: 0.9, reason: 'test signal' };
+                },
+            };
+            const { api, engine } = setup(liveCfg({ bulkSize: 1 }), { strategy: oneSignal });
+            api.responders.unshift(req =>
+                req.proposal_open_contract
+                    ? {
+                          subscription: { id: 'already-sold' },
+                          proposal_open_contract: { contract_id: req.contract_id, is_sold: 1, profit: 2.5 },
+                      }
+                    : undefined
+            );
+            await engine.start();
+            await flush(12);
+
+            expect(evaluations).toBe(1);
+            expect(buys(api)).toHaveLength(1);
+            await engine.stop();
         });
         const stopped = engine.stop();
         gates.forEach(open => open(null)); // the buys complete AFTER Stop was requested

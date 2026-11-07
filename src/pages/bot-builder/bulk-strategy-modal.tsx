@@ -19,7 +19,17 @@ import { toCsv } from '@/utils/bulk-strategy/csv';
 import { createDerivApi, getAccountContext } from '@/utils/bulk-strategy/deriv-api';
 import { BulkEngine } from '@/utils/bulk-strategy/engine';
 import { getStrategy, listStrategies } from '@/utils/bulk-strategy/strategies';
-import type { AccountKind, BulkConfig, EngineStatus, RoundLog, Risk, RunMode, Summary } from '@/utils/bulk-strategy/types';
+import type {
+    AccountKind,
+    BulkConfig,
+    EngineStatus,
+    RoundLog,
+    Risk,
+    RunMode,
+    SignalDiagnostics,
+    SignalEvaluationStats,
+    Summary,
+} from '@/utils/bulk-strategy/types';
 import './bulk-strategy-modal.scss';
 
 type Props = {
@@ -72,7 +82,14 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
     const [engine_status, setEngineStatus] = React.useState<EngineStatus>('idle');
     const [logs, setLogs] = React.useState<RoundLog[]>([]);
     const [summary, setSummary] = React.useState<Summary | null>(null);
-    const [tick_info, setTickInfo] = React.useState<{ last: number; ticks: number; score: number | null } | null>(null);
+    const [tick_info, setTickInfo] = React.useState<{
+        last: number;
+        ticks: number;
+        ticksSeen: number;
+        score: number | null;
+        diagnostics: SignalDiagnostics | null;
+        signalStats: SignalEvaluationStats;
+    } | null>(null);
     const [error_msg, setErrorMsg] = React.useState('');
 
     const [real_confirm_open, setRealConfirmOpen] = React.useState(false);
@@ -292,9 +309,11 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
             const have = tick_info?.ticks ?? 0;
             const minTicks = strategy?.minTicks ?? 0;
             if (have < minTicks) return localize('Collecting real ticks ({{have}}/{{minimum}})…', { have, minimum: minTicks });
-            const score = tick_info?.score;
-            return localize('Waiting for a signal: model score {{score}} (uncalibrated; needs 0.50){{timeout}}…', {
-                score: score === null || score === undefined ? '–' : score.toFixed(2),
+            const reason =
+                tick_info?.diagnostics?.rejectionReason ??
+                localize('Model has not produced a signal yet.');
+            return localize('Waiting for a signal: {{reason}}{{timeout}}…', {
+                reason,
                 timeout: running_config?.tradeAnywayAfterMs ? localize(', or the 5 s timeout') : '',
             });
         }
@@ -617,8 +636,11 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                             disabled={locked}
                             onChange={e => patch({ tradeAnywayAfterMs: e.target.checked ? TRADE_ANYWAY_MS : null })}
                         />
-                        <span>{localize('Trade anyway after 5 s without a signal (off by default)')}</span>
+                        <span>{localize('TESTING ONLY: force a test entry after 5 s without a signal (off by default)')}</span>
                     </label>
+                    <p className='bulk-strategy-modal__hint'>
+                        {localize('Testing-only timeout entries are marked in the log and excluded from model win-rate statistics.')}
+                    </p>
                 </section>
 
                 {/* ─── Safety ─── */}
@@ -710,12 +732,71 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                             <strong>{`${config.mode === 'paper' ? localize('Paper') : localize('Live')} · ${engine_status}`}</strong>
                             {tick_info && (
                                 <span>
-                                    {` · ${tick_info.ticks} ${localize('ticks')} · ${localize('last')} ${tick_info.last}`}
+                                    {` · ${tick_info.ticksSeen} ${localize('ticks seen')} (${tick_info.ticks} ${localize('in buffer')}) · ${localize('last')} ${tick_info.last}`}
                                     {tick_info.score !== null && ` · score ${tick_info.score.toFixed(2)}`}
                                 </span>
                             )}
                             <span>{` · ${localize('rounds')} ${logs.length} · ${localize('net')} ${money(net)}`}</span>
                         </p>
+                        {tick_info?.diagnostics && (
+                            <details className='bulk-strategy-modal__diagnostics' data-testid='dt_bulk_diagnostics'>
+                                <summary>{localize('Signal diagnostics')}</summary>
+                                <p>
+                                    {localize('Training outcomes: {{samples}} samples · {{positive}} positive ({{positiveRate}}) · {{negative}} negative ({{negativeRate}})', {
+                                        samples: tick_info.diagnostics.trainingSampleCount,
+                                        positive: tick_info.diagnostics.positiveExamples,
+                                        positiveRate:
+                                            tick_info.diagnostics.positiveOutcomeRate === null
+                                                ? '–'
+                                                : `${(tick_info.diagnostics.positiveOutcomeRate * 100).toFixed(1)}%`,
+                                        negative: tick_info.diagnostics.negativeExamples,
+                                        negativeRate:
+                                            tick_info.diagnostics.negativeOutcomeRate === null
+                                                ? '–'
+                                                : `${(tick_info.diagnostics.negativeOutcomeRate * 100).toFixed(1)}%`,
+                                    })}
+                                </p>
+                                <p>
+                                    {localize('Model {{trained}} · score {{score}} · entry threshold {{threshold}}', {
+                                        trained: tick_info.diagnostics.modelTrained ? localize('trained') : localize('not trained'),
+                                        score:
+                                            tick_info.diagnostics.currentModelScore === null
+                                                ? '–'
+                                                : tick_info.diagnostics.currentModelScore.toFixed(3),
+                                        threshold: tick_info.diagnostics.entryThreshold.toFixed(2),
+                                    })}
+                                </p>
+                                <p>
+                                    {localize(
+                                        'The score is uncalibrated, not a win probability. The production threshold stays at 0.50 until actual chronological ticks and Deriv payout quotes support a different value.'
+                                    )}
+                                </p>
+                                <p>
+                                    {localize('Evaluations {{evaluations}} · model signals {{signals}} ({{rate}}) · signal available: {{available}}', {
+                                        evaluations: tick_info.signalStats.evaluations,
+                                        signals: tick_info.signalStats.modelSignals,
+                                        rate: `${(tick_info.signalStats.signalRate * 100).toFixed(1)}%`,
+                                        available: tick_info.diagnostics.signalAvailable ? localize('yes') : localize('no'),
+                                    })}
+                                </p>
+                                {tick_info.diagnostics.rejectionReason && (
+                                    <p data-testid='dt_bulk_rejection_reason'>
+                                        {localize('Entry rejected: {{reason}}', {
+                                            reason: tick_info.diagnostics.rejectionReason,
+                                        })}
+                                    </p>
+                                )}
+                                {Object.keys(tick_info.signalStats.rejectionsByReason).length > 0 && (
+                                    <p>
+                                        {localize('Rejected evaluations: {{rejections}}', {
+                                            rejections: Object.entries(tick_info.signalStats.rejectionsByReason)
+                                                .map(([reason, count]) => `${reason}: ${count}`)
+                                                .join(', '),
+                                        })}
+                                    </p>
+                                )}
+                            </details>
+                        )}
                     </section>
                 )}
 
@@ -747,7 +828,10 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                         <tr key={log.round} data-testid='dt_bulk_log_row' title={log.note || undefined}>
                                             <td>{log.round}</td>
                                             <td>{new Date(log.time).toLocaleTimeString()}</td>
-                                            <td>{log.contracts}</td>
+                                            <td>
+                                                {log.testingOnly && <strong>{localize('TEST ONLY')} · </strong>}
+                                                {log.contracts}
+                                            </td>
                                             <td>{money(log.stake)}</td>
                                             <td>{`${log.won}/${log.lost}${log.interrupted ? ` (+${log.interrupted}?)` : ''}`}</td>
                                             <td className={log.net < 0 ? 'bulk-strategy-modal__neg' : 'bulk-strategy-modal__pos'}>{money(log.net)}</td>
@@ -771,6 +855,12 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                             <div>
                                 <dt>{localize('Win rate (per contract)')}</dt>
                                 <dd data-testid='dt_bulk_sum_winrate'>{summary.winRate === null ? '–' : `${(summary.winRate * 100).toFixed(1)}%`}</dd>
+                            </div>
+                            <div>
+                                <dt>{localize('Model-triggered win rate (test-only entries excluded)')}</dt>
+                                <dd data-testid='dt_bulk_sum_model_winrate'>
+                                    {summary.modelWinRate === null ? '–' : `${(summary.modelWinRate * 100).toFixed(1)}%`}
+                                </dd>
                             </div>
                             <div><dt>{localize('Net P/L')}</dt><dd data-testid='dt_bulk_sum_net'>{money(summary.net)}</dd></div>
                             <div><dt>{localize('Worst losing streak')}</dt><dd data-testid='dt_bulk_sum_streak'>{summary.worstLossStreak}</dd></div>

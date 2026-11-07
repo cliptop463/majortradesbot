@@ -1,4 +1,4 @@
-import type { BulkConfig, BulkStrategy, ContractSpec, SignalResult } from '../types';
+import type { BulkConfig, BulkStrategy, ContractSpec, SignalDiagnostics, SignalResult } from '../types';
 
 /** Tick Striker V3 scores the actual TICKHIGH selected-tick-5 outcome. */
 export const MIN_TICKS = 300;
@@ -10,14 +10,49 @@ export const MIN_POSITIVE_EXAMPLES = 8;
 export const MIN_NEGATIVE_EXAMPLES = 30;
 export const SELECTED_TICK = 5;
 export const THRESHOLD = 0.5;
+export const THRESHOLD_CANDIDATES = [0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5] as const;
 
 const TRAINING_EPOCHS = 350;
 const LEARNING_RATE = 0.08;
 const L2_PENALTY = 0.01;
+const WALK_FORWARD_TRAIN_FRACTION = 0.6;
+const WALK_FORWARD_VALIDATION_FRACTION = 0.2;
 
 type Features = [number, number, number, number, number, number];
-type Example = { x: Features; y: 0 | 1 };
+type Example = { x: Features; y: 0 | 1; end: number };
 type LogisticModel = { weights: number[]; means: number[]; scales: number[] };
+
+export interface HistoricalPayoutQuote {
+    /** Tick index at which the entry could have been placed. */
+    tickIndex: number;
+    askPrice: number;
+    payout: number;
+}
+
+export interface ThresholdBacktestMetrics {
+    threshold: number;
+    signalFrequency: number;
+    winRate: number | null;
+    trades: number;
+    expectedValue: number | null;
+    maximumDrawdown: number;
+}
+
+export interface WalkForwardThresholdResult {
+    trainingSamples: number;
+    validationSamples: number;
+    outOfSampleSamples: number;
+    positiveExamples: number;
+    negativeExamples: number;
+    positiveOutcomeRate: number | null;
+    negativeOutcomeRate: number | null;
+    embargoTicks: number;
+    candidateResults: ThresholdBacktestMetrics[];
+    selectedThreshold: number | null;
+    outOfSample: ThresholdBacktestMetrics | null;
+    scoreDistribution: { min: number; p25: number; median: number; p75: number; max: number } | null;
+    reason: string | null;
+}
 
 const contract = (_config: BulkConfig): ContractSpec => ({
     contract_type: 'TICKHIGH',
@@ -85,7 +120,7 @@ function createExamples(prices: readonly number[]): Example[] {
         const future = prices.slice(end + 1, end + 1 + PREDICTION_HORIZON);
 
         if (!features || future.length !== PREDICTION_HORIZON || !future.every(isValidQuote)) continue;
-        rows.push({ x: features, y: isSelectedTickStrictlyHighest(future, SELECTED_TICK) ? 1 : 0 });
+        rows.push({ x: features, y: isSelectedTickStrictlyHighest(future, SELECTED_TICK) ? 1 : 0, end });
     }
 
     return rows;
@@ -103,6 +138,7 @@ function fitLogisticRegression(rows: readonly Example[]): LogisticModel | null {
     const normalized = rows.map(row => row.x.map((value, column) => (value - means[column]) / scales[column]));
     const positives = rows.reduce((count, row) => count + row.y, 0);
     const negatives = rows.length - positives;
+    if (positives === 0 || negatives === 0) return null;
     const weights = Array(featureCount + 1).fill(0) as number[];
     weights[0] = Math.log(positives / negatives);
 
@@ -132,48 +168,312 @@ function fitLogisticRegression(rows: readonly Example[]): LogisticModel | null {
     return { weights, means, scales };
 }
 
-function unavailable(reason: string): SignalResult {
-    return { trade: false, score: null, reason };
+function diagnostics(
+    ticks: number,
+    rows: readonly Example[],
+    score: number | null,
+    threshold: number,
+    modelTrained: boolean,
+    rejectionCode: string | null,
+    rejectionReason: string | null
+): SignalDiagnostics {
+    const positives = rows.reduce((count, row) => count + row.y, 0);
+    const negatives = rows.length - positives;
+    return {
+        tickCount: ticks,
+        trainingSampleCount: rows.length,
+        positiveExamples: positives,
+        negativeExamples: negatives,
+        positiveOutcomeRate: rows.length > 0 ? positives / rows.length : null,
+        negativeOutcomeRate: rows.length > 0 ? negatives / rows.length : null,
+        currentModelScore: score,
+        entryThreshold: threshold,
+        modelTrained,
+        signalAvailable: rejectionCode === null,
+        rejectionCode,
+        rejectionReason,
+    };
 }
 
-export function evaluate(ticks: readonly number[]): SignalResult {
+function reject(
+    ticks: number,
+    rows: readonly Example[],
+    threshold: number,
+    rejectionCode: string,
+    rejectionReason: string,
+    modelTrained = false,
+    score: number | null = null
+): SignalResult {
+    return {
+        trade: false,
+        score,
+        reason: rejectionReason,
+        diagnostics: diagnostics(ticks, rows, score, threshold, modelTrained, rejectionCode, rejectionReason),
+    };
+}
+
+function scoreWithModel(model: LogisticModel, features: Features): number {
+    const logit =
+        model.weights[0] +
+        features.reduce(
+            (sum, value, column) => sum + ((value - model.means[column]) / model.scales[column]) * model.weights[column + 1],
+            0
+        );
+    return sigmoid(logit);
+}
+
+export function evaluate(ticks: readonly number[], entryThreshold = THRESHOLD): SignalResult {
     const window = ticks.slice(-BUFFER_SIZE);
     if (window.some(quote => !isValidQuote(quote))) {
-        return unavailable('Invalid tick data: quotes must be finite positive numbers.');
+        return reject(
+            window.length,
+            [],
+            entryThreshold,
+            'invalid_tick_data',
+            'Invalid tick data: quotes must be finite positive numbers.'
+        );
     }
+
+    const rows = createExamples(window);
     if (window.length < MIN_TICKS) {
-        return unavailable(`Need ${MIN_TICKS} ticks, have ${window.length}.`);
+        return reject(
+            window.length,
+            rows,
+            entryThreshold,
+            'insufficient_ticks',
+            `Need ${MIN_TICKS} ticks, have ${window.length}.`
+        );
     }
 
     const currentFeatures = extractFeatures(window);
-    const rows = createExamples(window);
     const positives = rows.reduce((count, row) => count + row.y, 0);
     const negatives = rows.length - positives;
 
     if (positives < MIN_POSITIVE_EXAMPLES || negatives < MIN_NEGATIVE_EXAMPLES) {
-        return unavailable(
+        return reject(
+            window.length,
+            rows,
+            entryThreshold,
+            'insufficient_outcomes',
             `Insufficient TICKHIGH outcome classes: need ${MIN_POSITIVE_EXAMPLES} positive and ${MIN_NEGATIVE_EXAMPLES} negative examples; have ${positives} and ${negatives}.`
         );
     }
 
     const model = fitLogisticRegression(rows);
-    if (!currentFeatures || !model) return unavailable('TICKHIGH model features or training are invalid.');
-
-    const logit =
-        model.weights[0] +
-        currentFeatures.reduce(
-            (sum, value, column) => sum + ((value - model.means[column]) / model.scales[column]) * model.weights[column + 1],
-            0
+    if (!model) {
+        return reject(window.length, rows, entryThreshold, 'model_training_failed', 'TICKHIGH model training failed.');
+    }
+    if (!currentFeatures) {
+        return reject(
+            window.length,
+            rows,
+            entryThreshold,
+            'invalid_features',
+            'TICKHIGH model features are invalid.',
+            true
         );
-    const score = sigmoid(logit);
+    }
+    if (!Number.isFinite(entryThreshold) || entryThreshold < 0 || entryThreshold > 1) {
+        return reject(
+            window.length,
+            rows,
+            entryThreshold,
+            'invalid_threshold',
+            'TICKHIGH entry threshold must be between 0 and 1.',
+            true
+        );
+    }
 
-    if (!Number.isFinite(score)) return unavailable('TICKHIGH model produced a non-finite score.');
+    const score = scoreWithModel(model, currentFeatures);
+    if (!Number.isFinite(score)) {
+        return reject(
+            window.length,
+            rows,
+            entryThreshold,
+            'invalid_score',
+            'TICKHIGH model produced a non-finite score.',
+            true
+        );
+    }
 
-    const trade = score >= THRESHOLD;
+    const trade = score >= entryThreshold;
+    const rejectionReason = trade
+        ? null
+        : `Model score ${score.toFixed(3)} is below entry threshold ${entryThreshold.toFixed(2)}.`;
+    const modelReason = `Uncalibrated TICKHIGH model score ${score.toFixed(3)} from ${rows.length} historical outcomes (${positives} positive, ${negatives} negative); threshold ${entryThreshold.toFixed(2)}.`;
     return {
         trade,
         score,
-        reason: `Uncalibrated TICKHIGH model score ${score.toFixed(3)} from ${rows.length} historical outcomes (${positives} positive, ${negatives} negative); threshold ${THRESHOLD.toFixed(2)}.`,
+        reason: rejectionReason ? `${modelReason} ${rejectionReason}` : modelReason,
+        diagnostics: diagnostics(
+            window.length,
+            rows,
+            score,
+            entryThreshold,
+            true,
+            trade ? null : 'below_threshold',
+            rejectionReason
+        ),
+    };
+}
+
+function scoreDistribution(scores: readonly number[]) {
+    if (scores.length === 0) return null;
+    const ordered = [...scores].sort((a, b) => a - b);
+    const percentile = (fraction: number) => ordered[Math.floor((ordered.length - 1) * fraction)];
+    return {
+        min: ordered[0],
+        p25: percentile(0.25),
+        median: percentile(0.5),
+        p75: percentile(0.75),
+        max: ordered[ordered.length - 1],
+    };
+}
+
+function backtestThreshold(
+    scoredRows: readonly { example: Example; score: number; quote: HistoricalPayoutQuote }[],
+    threshold: number
+): ThresholdBacktestMetrics {
+    const eligible = scoredRows.filter(row => row.score >= threshold);
+    let net = 0;
+    let peak = 0;
+    let maximumDrawdown = 0;
+    let wins = 0;
+
+    eligible.forEach(({ example, quote }) => {
+        const won = example.y === 1;
+        if (won) wins++;
+        net += won ? quote.payout - quote.askPrice : -quote.askPrice;
+        peak = Math.max(peak, net);
+        maximumDrawdown = Math.max(maximumDrawdown, peak - net);
+    });
+
+    return {
+        threshold,
+        signalFrequency: scoredRows.length > 0 ? eligible.length / scoredRows.length : 0,
+        winRate: eligible.length > 0 ? wins / eligible.length : null,
+        trades: eligible.length,
+        expectedValue: eligible.length > 0 ? net / eligible.length : null,
+        maximumDrawdown,
+    };
+}
+
+/**
+ * Selects a score threshold on a chronological validation window and reports it on a later
+ * out-of-sample window. Quotes must be the historical Deriv ask/payout available at each entry.
+ */
+export function walkForwardThresholdTest(
+    ticks: readonly number[],
+    payoutQuotes: readonly HistoricalPayoutQuote[],
+    candidates: readonly number[] = THRESHOLD_CANDIDATES
+): WalkForwardThresholdResult {
+    const window = ticks.slice(-BUFFER_SIZE);
+    const rows = window.every(isValidQuote) ? createExamples(window) : [];
+    const positives = rows.reduce((count, row) => count + row.y, 0);
+    const negatives = rows.length - positives;
+    const emptyResult = (reason: string): WalkForwardThresholdResult => ({
+        trainingSamples: 0,
+        validationSamples: 0,
+        outOfSampleSamples: 0,
+        positiveExamples: positives,
+        negativeExamples: negatives,
+        positiveOutcomeRate: rows.length > 0 ? positives / rows.length : null,
+        negativeOutcomeRate: rows.length > 0 ? negatives / rows.length : null,
+        embargoTicks: PREDICTION_HORIZON,
+        candidateResults: [],
+        selectedThreshold: null,
+        outOfSample: null,
+        scoreDistribution: null,
+        reason,
+    });
+
+    if (window.length < MIN_TICKS) return emptyResult(`Need ${MIN_TICKS} valid ticks for walk-forward testing.`);
+    if (positives < MIN_POSITIVE_EXAMPLES || negatives < MIN_NEGATIVE_EXAMPLES) {
+        return emptyResult('Insufficient positive or negative outcomes for walk-forward training.');
+    }
+    if (candidates.length === 0 || candidates.some(value => !Number.isFinite(value) || value < 0 || value > 1)) {
+        return emptyResult('Threshold candidates must be finite values between 0 and 1.');
+    }
+
+    const trainingBoundary = Math.floor(window.length * WALK_FORWARD_TRAIN_FRACTION);
+    const validationBoundary = Math.floor(
+        window.length * (WALK_FORWARD_TRAIN_FRACTION + WALK_FORWARD_VALIDATION_FRACTION)
+    );
+    const trainingRows = rows.filter(row => row.end + PREDICTION_HORIZON < trainingBoundary);
+    const trainingPositives = trainingRows.reduce((count, row) => count + row.y, 0);
+    const trainingNegatives = trainingRows.length - trainingPositives;
+    if (trainingPositives < MIN_POSITIVE_EXAMPLES || trainingNegatives < MIN_NEGATIVE_EXAMPLES) {
+        return emptyResult('Insufficient training outcomes before the chronological validation window.');
+    }
+
+    const model = fitLogisticRegression(trainingRows);
+    if (!model) return emptyResult('TICKHIGH model training failed in the chronological training window.');
+
+    const quotesByTick = new Map(
+        payoutQuotes
+            .filter(
+                quote =>
+                    Number.isInteger(quote.tickIndex) &&
+                    Number.isFinite(quote.askPrice) &&
+                    Number.isFinite(quote.payout) &&
+                    quote.askPrice > 0 &&
+                    quote.payout > 0
+            )
+            .map(quote => [quote.tickIndex, quote] as const)
+    );
+    const scoreRows = rows
+        .filter(row => row.end >= trainingBoundary + PREDICTION_HORIZON && row.end + PREDICTION_HORIZON < window.length)
+        .map(example => {
+            const quote = quotesByTick.get(example.end);
+            const score = scoreWithModel(model, example.x);
+            return quote && Number.isFinite(score) ? { example, score, quote } : null;
+        })
+        .filter((row): row is { example: Example; score: number; quote: HistoricalPayoutQuote } => row !== null);
+    const validationRows = scoreRows.filter(row => row.example.end + PREDICTION_HORIZON < validationBoundary);
+    const outOfSampleRows = scoreRows.filter(row => row.example.end >= validationBoundary + PREDICTION_HORIZON);
+
+    if (validationRows.length === 0 || outOfSampleRows.length === 0) {
+        return {
+            ...emptyResult('Not enough payout-quoted observations in both validation and out-of-sample windows.'),
+            trainingSamples: trainingRows.length,
+            validationSamples: validationRows.length,
+            outOfSampleSamples: outOfSampleRows.length,
+        };
+    }
+
+    const candidateResults = candidates
+        .map(threshold => backtestThreshold(validationRows, threshold))
+        .sort((a, b) => {
+            const aValue = a.expectedValue ?? Number.NEGATIVE_INFINITY;
+            const bValue = b.expectedValue ?? Number.NEGATIVE_INFINITY;
+            return bValue - aValue || b.threshold - a.threshold;
+        });
+    const selected = candidateResults.find(result => result.trades > 0 && (result.expectedValue ?? 0) > 0);
+    if (!selected) {
+        return {
+            ...emptyResult('No candidate threshold had positive validation expected value after quoted payout.'),
+            trainingSamples: trainingRows.length,
+            validationSamples: validationRows.length,
+            outOfSampleSamples: outOfSampleRows.length,
+            candidateResults,
+            scoreDistribution: scoreDistribution(outOfSampleRows.map(row => row.score)),
+        };
+    }
+
+    return {
+        trainingSamples: trainingRows.length,
+        validationSamples: validationRows.length,
+        outOfSampleSamples: outOfSampleRows.length,
+        positiveExamples: positives,
+        negativeExamples: negatives,
+        positiveOutcomeRate: rows.length > 0 ? positives / rows.length : null,
+        negativeOutcomeRate: rows.length > 0 ? negatives / rows.length : null,
+        embargoTicks: PREDICTION_HORIZON,
+        candidateResults,
+        selectedThreshold: selected.threshold,
+        outOfSample: backtestThreshold(outOfSampleRows, selected.threshold),
+        scoreDistribution: scoreDistribution(outOfSampleRows.map(row => row.score)),
+        reason: null,
     };
 }
 

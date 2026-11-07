@@ -508,8 +508,10 @@ describe('quick test (the simple path)', () => {
         render(<BulkStrategyModal {...props()} />);
         await startQuick();
         const text = screen.getByTestId('dt_bulk_status_text').textContent;
-        expect(text).toContain('Waiting for a signal: model score – (uncalibrated; needs 0.50)');
+        expect(text).toContain('Waiting for a signal: Insufficient TICKHIGH outcome classes');
         expect(text).toContain('5 s timeout'); // the quick test turns the timeout on so something visibly happens
+        expect(screen.getByTestId('dt_bulk_diagnostics').textContent).toContain('entry threshold 0.50');
+        expect(screen.getByTestId('dt_bulk_rejection_reason').textContent).toContain('Insufficient TICKHIGH outcome classes');
         await act(async () => {
             fireEvent.click(screen.getByTestId('dt_bulk_run'));
             await flush();

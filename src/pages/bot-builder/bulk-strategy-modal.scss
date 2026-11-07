@@ -96,6 +96,25 @@
         overflow-wrap: anywhere;
     }
 
+    &__diagnostics {
+        margin-top: 0.8rem;
+        padding: 0.8rem;
+        border: 1px solid var(--border-normal);
+        border-radius: 0.4rem;
+        font-size: 1.1rem;
+        overflow-wrap: anywhere;
+
+        summary {
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0.6rem 0 0;
+            color: var(--text-less-prominent);
+        }
+    }
+
     &__select,
     &__field input {
         width: 100%;

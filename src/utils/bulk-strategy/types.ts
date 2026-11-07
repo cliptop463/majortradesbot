@@ -40,6 +40,32 @@ export interface SignalResult {
     /** A strategy score; null means the strategy cannot score the available data yet. */
     score: number | null;
     reason: string;
+    /** Optional structured diagnostics for strategies that expose their model state. */
+    diagnostics?: SignalDiagnostics;
+    /** Entries forced by an explicitly enabled test timeout are not model signals. */
+    testingOnly?: boolean;
+}
+
+export interface SignalDiagnostics {
+    tickCount: number;
+    trainingSampleCount: number;
+    positiveExamples: number;
+    negativeExamples: number;
+    positiveOutcomeRate: number | null;
+    negativeOutcomeRate: number | null;
+    currentModelScore: number | null;
+    entryThreshold: number;
+    modelTrained: boolean;
+    signalAvailable: boolean;
+    rejectionCode: string | null;
+    rejectionReason: string | null;
+}
+
+export interface SignalEvaluationStats {
+    evaluations: number;
+    modelSignals: number;
+    signalRate: number;
+    rejectionsByReason: Record<string, number>;
 }
 
 /** A pluggable strategy: what to buy, when to enter, and how a paper contract settles. */
@@ -86,6 +112,8 @@ export interface RoundLog {
     cumulative: number;
     /** Strategy score; null means no score was available when the round was started. */
     score: number | null;
+    /** True when the optional test timeout, rather than the model, triggered this round. */
+    testingOnly?: boolean;
     note: string;
 }
 
@@ -103,6 +131,10 @@ export interface Summary {
     worstLossStreak: number;
     /** Average stake / payout seen on real quotes: the win rate needed to break even. */
     breakEvenWinRate: number | null;
+    /** Results from model-triggered contracts only; excludes testing-only timeout entries. */
+    modelContractsWon: number;
+    modelContractsLost: number;
+    modelWinRate: number | null;
     stopReason: string;
 }
 
@@ -110,7 +142,14 @@ export type EngineStatus = 'idle' | 'connecting' | 'waiting' | 'trading' | 'stop
 
 export interface EngineEvents {
     onStatus?(status: EngineStatus): void;
-    onTick?(info: { last: number; ticks: number; score: number | null }): void;
+    onTick?(info: {
+        last: number;
+        ticks: number;
+        ticksSeen: number;
+        score: number | null;
+        diagnostics: SignalDiagnostics | null;
+        signalStats: SignalEvaluationStats;
+    }): void;
     onRound?(log: RoundLog): void;
     onStop?(summary: Summary): void;
     onError?(message: string): void;
