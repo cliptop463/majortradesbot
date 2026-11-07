@@ -280,9 +280,7 @@
     }
 
     &:not(&--no-placeholder) {
-        $parent: &;
-
-        #{$parent}__label {
+        .dc-input__label {
             color: var(--text-general);
             transition: 0.25s ease all;
             transform: translateZ(0);
