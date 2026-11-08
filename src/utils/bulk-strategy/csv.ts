@@ -6,6 +6,7 @@ export const CSV_HEADER = [
     'mode',
     'symbol',
     'contracts',
+    'failed',
     'stake',
     'cost',
     'won',
@@ -15,6 +16,7 @@ export const CSV_HEADER = [
     'cumulative',
     'score',
     'testingOnly',
+    'tradeResults',
     'note',
 ] as const;
 
@@ -33,6 +35,7 @@ export function toCsv(logs: readonly RoundLog[]): string {
             l.mode,
             l.symbol,
             l.contracts,
+            l.failed,
             l.stake.toFixed(2),
             l.cost.toFixed(2),
             l.won,
@@ -42,6 +45,7 @@ export function toCsv(logs: readonly RoundLog[]): string {
             l.cumulative.toFixed(2),
             l.score === null ? '' : l.score.toFixed(3),
             l.testingOnly ?? false,
+            l.tradeResults ? JSON.stringify(l.tradeResults) : '',
             l.note,
         ]
             .map(cell)

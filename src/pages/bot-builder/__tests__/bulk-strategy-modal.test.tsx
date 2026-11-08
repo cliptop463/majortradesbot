@@ -119,7 +119,22 @@ describe('defaults and saved settings', () => {
         renderOpen(<BulkStrategyModal {...props()} />);
         const markets = Array.from(screen.getByTestId('dt_bulk_market').options).map(o => o.value);
         expect(markets).toEqual(expect.arrayContaining(['R_100', '1HZ100V']));
-        expect(Array.from(screen.getByTestId('dt_bulk_strategy').options).map(o => o.textContent)).toEqual(['Tick Striker V3']);
+        expect(Array.from(screen.getByTestId('dt_bulk_strategy').options).map(o => o.textContent)).toEqual([
+            'Tick Striker V3',
+            'Last-Ticks Matches',
+        ]);
+    });
+
+    it('shows and saves a separate Matches digit count only for that strategy', () => {
+        renderOpen(<BulkStrategyModal {...props()} />);
+        expect(screen.queryByTestId('dt_bulk_matchesTickCount')).toBeNull();
+        fireEvent.change(screen.getByTestId('dt_bulk_strategy'), { target: { value: 'last-ticks-matches' } });
+        expect(screen.getByTestId('dt_bulk_matchesTickCount').value).toBe('5');
+        field('matchesTickCount', '8');
+        fireEvent.click(screen.getByTestId('dt_bulk_save'));
+        expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toMatchObject({ matchesTickCount: 8, bulkSize: 3 });
+        fireEvent.change(screen.getByTestId('dt_bulk_strategy'), { target: { value: 'tick-striker' } });
+        expect(screen.queryByTestId('dt_bulk_matchesTickCount')).toBeNull();
     });
 
     it('reloads the saved config on load, but never restores Real', () => {

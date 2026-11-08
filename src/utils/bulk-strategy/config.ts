@@ -1,4 +1,5 @@
 import { DEFAULT_STRATEGY_ID, getStrategy } from './strategies';
+import { validateMatchesTickCount } from './strategies/last-ticks-matches';
 import type { AccountKind, BulkConfig, Risk, RunMode } from './types';
 
 export const STORAGE_KEY = 'bulk_strategy_config_v1';
@@ -21,6 +22,7 @@ export const DEFAULT_CONFIG: BulkConfig = {
     symbol: 'R_100',
     risk: 'medium',
     bulkSize: RISK_PRESETS.medium.bulkSize,
+    matchesTickCount: 5,
     stake: 0.35,
     profitTarget: 5,
     maxLoss: 20,
@@ -76,11 +78,15 @@ export function nextStake(config: BulkConfig, lossStreak: number): number {
  * round from step 0 to maxSteps loses (bulk x stake x sum of multiplier^k); with it off, one full round.
  */
 export function worstCaseCost(config: BulkConfig): number {
-    const perRound = config.bulkSize * config.stake;
+    const perRound = effectiveBatchSize(config) * config.stake;
     if (!config.martingale.enabled) return round2(perRound);
     let total = 0;
     for (let k = 0; k <= config.martingale.maxSteps; k++) total += perRound * Math.pow(config.martingale.multiplier, k);
     return round2(total);
+}
+
+export function effectiveBatchSize(config: BulkConfig): number {
+    return getStrategy(config.strategyId)?.batchSize?.(config) ?? config.bulkSize;
 }
 
 const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
@@ -92,6 +98,9 @@ export function validateConfig(config: BulkConfig): string[] {
     if (!(MARKETS as readonly string[]).includes(config.symbol)) problems.push('Choose a volatility index.');
     if (!Number.isInteger(config.bulkSize) || config.bulkSize < MIN_BULK || config.bulkSize > MAX_BULK) {
         problems.push(`Bulk size must be a whole number from ${MIN_BULK} to ${MAX_BULK}.`);
+    }
+    if (config.strategyId === 'last-ticks-matches' && !validateMatchesTickCount(config.matchesTickCount)) {
+        problems.push('Number of recent tick digits must be a whole number from 1 to 10.');
     }
     if (!isNum(config.stake) || config.stake <= 0) problems.push('Stake must be greater than 0.');
     if (!isNum(config.profitTarget) || config.profitTarget <= 0) problems.push('Profit target must be greater than 0.');
@@ -152,6 +161,7 @@ export function loadConfig(storage: StorageLike | null = safeStorage()): BulkCon
         symbol: pick(raw.symbol, MARKETS, defaults.symbol as (typeof MARKETS)[number]),
         risk: pick<Risk>(raw.risk, ['low', 'medium', 'high'], defaults.risk),
         bulkSize: Number.isInteger(raw.bulkSize) ? raw.bulkSize : defaults.bulkSize,
+        matchesTickCount: validateMatchesTickCount(raw.matchesTickCount) ? raw.matchesTickCount : defaults.matchesTickCount,
         stake: num(raw.stake, defaults.stake),
         profitTarget: num(raw.profitTarget, defaults.profitTarget),
         maxLoss: num(raw.maxLoss, defaults.maxLoss),

@@ -8,6 +8,7 @@ const log = (patch: Partial<RoundLog> = {}): RoundLog => ({
     mode: 'paper',
     symbol: 'R_100',
     contracts: 3,
+    failed: 0,
     stake: 0.35,
     cost: 1.05,
     won: 0,
@@ -25,7 +26,7 @@ describe('toCsv', () => {
         const lines = toCsv([log(), log({ round: 2, won: 3, lost: 0, net: 2.1, cumulative: 1.05 })]).split('\n');
         expect(lines[0]).toBe(CSV_HEADER.join(','));
         expect(lines).toHaveLength(3);
-        expect(lines[1]).toBe('1,2026-11-04T10:00:00.000Z,paper,R_100,3,0.35,1.05,0,3,0,-1.05,-1.05,0.612,false,');
+        expect(lines[1]).toBe('1,2026-11-04T10:00:00.000Z,paper,R_100,3,0,0.35,1.05,0,3,0,-1.05,-1.05,0.612,false,,');
         expect(lines[2].startsWith('2,')).toBe(true);
     });
 
@@ -34,11 +35,11 @@ describe('toCsv', () => {
     });
 
     it('leaves the score empty when the strategy could not produce one', () => {
-        expect(toCsv([log({ score: null })]).split('\n')[1].split(',')[12]).toBe('');
+        expect(toCsv([log({ score: null })]).split('\n')[1].split(',')[13]).toBe('');
     });
 
     it('identifies timeout-forced entries as testing-only', () => {
-        expect(toCsv([log({ testingOnly: true })]).split('\n')[1].split(',')[13]).toBe('true');
+        expect(toCsv([log({ testingOnly: true })]).split('\n')[1].split(',')[14]).toBe('true');
     });
 
     it('quotes notes with commas, quotes and new lines', () => {

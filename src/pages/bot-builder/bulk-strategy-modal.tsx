@@ -42,7 +42,7 @@ type Props = {
 };
 
 type RunState = 'idle' | 'starting' | 'running' | 'stopping';
-type NumberText = { stake: string; profitTarget: string; maxLoss: string; bulkSize: string; multiplier: string; maxSteps: string };
+type NumberText = { stake: string; profitTarget: string; maxLoss: string; bulkSize: string; matchesTickCount: string; multiplier: string; maxSteps: string };
 
 const parse = (text: string) => (text.trim() === '' ? NaN : Number(text));
 const toText = (c: BulkConfig): NumberText => ({
@@ -50,6 +50,7 @@ const toText = (c: BulkConfig): NumberText => ({
     profitTarget: String(c.profitTarget),
     maxLoss: String(c.maxLoss),
     bulkSize: String(c.bulkSize),
+    matchesTickCount: String(c.matchesTickCount),
     multiplier: String(c.martingale.multiplier),
     maxSteps: String(c.martingale.maxSteps),
 });
@@ -111,6 +112,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
             profitTarget: parse(text.profitTarget),
             maxLoss: parse(text.maxLoss),
             bulkSize: parse(text.bulkSize),
+            matchesTickCount: parse(text.matchesTickCount),
             martingale: { ...base.martingale, multiplier: parse(text.multiplier), maxSteps: parse(text.maxSteps) },
         }),
         [base, text]
@@ -303,11 +305,11 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
         if (run_state === 'stopping') return localize('Stopping…');
         if (run_state === 'starting' || engine_status === 'connecting') return localize('Connecting to Deriv…');
         if (engine_status === 'trading') {
-            return localize('Round {{n}} running: waiting for 5 real ticks to settle…', { n: logs.length + 1 });
+            return localize('Round {{n}} running: waiting for contracts to settle…', { n: logs.length + 1 });
         }
         if (engine_status === 'waiting') {
             const have = tick_info?.ticks ?? 0;
-            const minTicks = strategy?.minTicks ?? 0;
+            const minTicks = strategy?.batchSize?.(running_config ?? config) ?? strategy?.minTicks ?? 0;
             if (have < minTicks) return localize('Collecting real ticks ({{have}}/{{minimum}})…', { have, minimum: minTicks });
             const reason =
                 tick_info?.diagnostics?.rejectionReason ??
@@ -422,6 +424,23 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                         ))}
                     </select>
                     {strategy && <p className='bulk-strategy-modal__hint'>{strategy.description}</p>}
+                    {base.strategyId === 'last-ticks-matches' && (
+                        <label className='bulk-strategy-modal__field' htmlFor='bulk-matches-tick-count'>
+                            <span>{localize('Number of Recent Tick Digits')}</span>
+                            <input
+                                id='bulk-matches-tick-count'
+                                data-testid='dt_bulk_matchesTickCount'
+                                type='number'
+                                min={1}
+                                max={10}
+                                step={1}
+                                inputMode='numeric'
+                                value={text.matchesTickCount}
+                                disabled={locked}
+                                onChange={setField('matchesTickCount')}
+                            />
+                        </label>
+                    )}
 
                     <label className='bulk-strategy-modal__label' htmlFor='bulk-market'>
                         {localize('Market')}
@@ -834,6 +853,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                             </td>
                                             <td>{money(log.stake)}</td>
                                             <td>{`${log.won}/${log.lost}${log.interrupted ? ` (+${log.interrupted}?)` : ''}`}</td>
+                                                <td>{`${log.won}/${log.lost}${log.failed ? ` (${log.failed} failed)` : ''}${log.interrupted ? ` (+${log.interrupted}?)` : ''}`}</td>
                                             <td className={log.net < 0 ? 'bulk-strategy-modal__neg' : 'bulk-strategy-modal__pos'}>{money(log.net)}</td>
                                             <td>{money(log.cumulative)}</td>
                                         </tr>
@@ -852,6 +872,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                             <div><dt>{localize('Rounds')}</dt><dd data-testid='dt_bulk_sum_rounds'>{summary.rounds}</dd></div>
                             <div><dt>{localize('Contracts won')}</dt><dd data-testid='dt_bulk_sum_won'>{summary.contractsWon}</dd></div>
                             <div><dt>{localize('Contracts lost')}</dt><dd data-testid='dt_bulk_sum_lost'>{summary.contractsLost}</dd></div>
+                            <div><dt>{localize('Contracts failed')}</dt><dd data-testid='dt_bulk_sum_failed'>{summary.contractsFailed}</dd></div>
                             <div>
                                 <dt>{localize('Win rate (per contract)')}</dt>
                                 <dd data-testid='dt_bulk_sum_winrate'>{summary.winRate === null ? '–' : `${(summary.winRate * 100).toFixed(1)}%`}</dd>

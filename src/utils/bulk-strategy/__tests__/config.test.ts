@@ -91,6 +91,19 @@ describe('worst-case cost and the hard safety cap', () => {
         expect(validateConfig(cfg({ bulkSize: 5, stake: 1, maxLoss: 75, martingale: { enabled: true, multiplier: 2, maxSteps: 3 } }))).toEqual([]);
     });
 
+    it('uses the Matches digit count, not bulkSize, for worst-case exposure', () => {
+        const matches = cfg({
+            strategyId: 'last-ticks-matches',
+            bulkSize: 1,
+            matchesTickCount: 5,
+            stake: 1,
+            maxLoss: 4,
+            martingale: { enabled: false, multiplier: 2, maxSteps: 2 },
+        });
+        expect(worstCaseCost(matches)).toBe(5);
+        expect(validateConfig(matches)[0]).toContain('5.00 exceeds your max loss 4.00');
+    });
+
     it('the High preset with default stake and limits is blocked until max loss is raised', () => {
         const high = applyRiskPreset(cfg(), 'high'); // 5 x 0.35 x 15 = 26.25 > 20
         expect(validateConfig(high)[0]).toContain('26.25');
@@ -104,6 +117,15 @@ describe('validation', () => {
         expect(validateConfig(cfg({ bulkSize: 11 }))[0]).toContain('Bulk size');
         expect(validateConfig(cfg({ bulkSize: 2.5 }))[0]).toContain('Bulk size');
         expect(validateConfig(cfg({ bulkSize: 10, stake: 0.35, maxLoss: 100 }))).toEqual([]);
+    });
+
+    it('validates the Matches recent digit count from 1 through 10', () => {
+        for (const matchesTickCount of [0, 11, 2.5, Number.NaN]) {
+            expect(validateConfig(cfg({ strategyId: 'last-ticks-matches', matchesTickCount }))).toContain(
+                'Number of recent tick digits must be a whole number from 1 to 10.'
+            );
+        }
+        expect(validateConfig(cfg({ strategyId: 'last-ticks-matches', matchesTickCount: 10 }))).toEqual([]);
     });
 
     it('rejects non-positive money fields and an unknown market or strategy', () => {
@@ -125,7 +147,7 @@ describe('validation', () => {
 describe('saving and loading', () => {
     it('round-trips a config through storage', () => {
         const storage = memoryStorage();
-        const custom = cfg({ symbol: '1HZ100V', stake: 1.25, bulkSize: 4, mode: 'live', tradeAnywayAfterMs: 5000 });
+        const custom = cfg({ symbol: '1HZ100V', stake: 1.25, bulkSize: 4, matchesTickCount: 8, mode: 'live', tradeAnywayAfterMs: 5000 });
         expect(saveConfig(custom, storage)).toBe(true);
         expect(loadConfig(storage)).toEqual({ ...custom, account: 'demo' });
     });

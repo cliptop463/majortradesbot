@@ -1,4 +1,4 @@
-import { nextStake, validateConfig } from './config';
+import { effectiveBatchSize, nextStake, validateConfig } from './config';
 import { getStrategy } from './strategies';
 import type {
     BulkApi,
@@ -12,6 +12,9 @@ import type {
     SignalEvaluationStats,
     SignalResult,
     Summary,
+    MarketTick,
+    TradeIntent,
+    TradeResult,
 } from './types';
 
 /**
@@ -40,6 +43,8 @@ interface RoundOutcome {
     outcomes: ContractOutcome[];
     placed: number;
     errors: string[];
+    failed?: number;
+    tradeResults?: TradeResult[];
 }
 
 export interface EngineOptions {
@@ -63,6 +68,7 @@ export class BulkEngine {
     private status: EngineStatus = 'idle';
 
     private ticks: number[] = [];
+        private marketTicks: MarketTick[] = [];
     private ticksSeen = 0;
     private lastScore: number | null = null;
     private lastDiagnostics: SignalDiagnostics | null = null;
@@ -83,6 +89,7 @@ export class BulkEngine {
     private cancelSignalWait: (() => void) | null = null;
     private onTickForSignal: (() => void) | null = null;
     private collector: { quotes: number[]; need: number; done: (quotes: number[] | null) => void } | null = null;
+        private tickWaiters = new Set<{ afterSequence: number; done: (tick: MarketTick | null) => void }>();
     private pocWaiters = new Map<number, (poc: any | null) => void>();
     private timers = new Set<ReturnType<typeof setTimeout>>();
 
@@ -95,6 +102,7 @@ export class BulkEngine {
         won: 0,
         lost: 0,
         interrupted: 0,
+        failed: 0,
         net: 0,
         lossStreak: 0,
         worstStreak: 0,
@@ -135,6 +143,7 @@ export class BulkEngine {
             contractsWon: this.stats.won,
             contractsLost: this.stats.lost,
             contractsInterrupted: this.stats.interrupted,
+            contractsFailed: this.stats.failed,
             winRate: settled > 0 ? this.stats.won / settled : null,
             net: round2(this.stats.net),
             worstLossStreak: this.stats.worstStreak,
@@ -183,6 +192,7 @@ export class BulkEngine {
         this.running = false;
         this.cancelSignalWait?.();
         this.collector?.done(null);
+        [...this.tickWaiters].forEach(waiter => waiter.done(null));
         this.pocWaiters.forEach(waiter => waiter(null));
     }
 
@@ -242,14 +252,18 @@ export class BulkEngine {
 
     private seed(response: any) {
         const prices: unknown[] = Array.isArray(response?.history?.prices) ? response.history.prices : [];
+        const pipSizeValue = response?.history?.pip_size ?? response?.pip_size ?? response?.tick?.pip_size;
+        const pipSize = Number.isInteger(Number(pipSizeValue)) ? Number(pipSizeValue) : null;
         prices.forEach(price => {
             const quote = Number(price);
             if (Number.isFinite(quote)) {
                 this.ticks.push(quote);
                 this.ticksSeen++;
+                this.marketTicks.push({ quote, pipSize, sequence: this.ticksSeen });
             }
         });
         this.ticks = this.ticks.slice(-this.strategy.bufferSize);
+        this.marketTicks = this.marketTicks.slice(-this.strategy.bufferSize);
         this.tickSequence = this.ticksSeen;
         this.emitTick();
     }
@@ -260,7 +274,7 @@ export class BulkEngine {
             const own = this.tickSubId
                 ? data.subscription?.id === this.tickSubId
                 : this.passiveTicks && data.tick.symbol === this.config.symbol;
-            if (own) this.pushTick(Number(data.tick.quote));
+                if (own) this.pushTick(Number(data.tick.quote), data.tick.pip_size);
         } else if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
             const poc = data.proposal_open_contract;
             const waiter = this.pocWaiters.get(Number(poc.contract_id));
@@ -268,16 +282,25 @@ export class BulkEngine {
         }
     }
 
-    private pushTick(quote: number) {
+    private pushTick(quote: number, pipSizeValue?: unknown) {
         if (!Number.isFinite(quote)) return;
+        const pipSize = Number.isInteger(Number(pipSizeValue)) ? Number(pipSizeValue) : null;
         this.ticks.push(quote);
+        this.marketTicks.push({ quote, pipSize, sequence: this.tickSequence + 1 });
         this.ticksSeen++;
         this.tickSequence++;
-        if (this.ticks.length > this.strategy.bufferSize) this.ticks.shift();
+        if (this.ticks.length > this.strategy.bufferSize) {
+            this.ticks.shift();
+            this.marketTicks.shift();
+        }
         if (this.collector) {
             this.collector.quotes.push(quote);
             if (this.collector.quotes.length >= this.collector.need) this.collector.done(this.collector.quotes);
         }
+        const latest = this.marketTicks[this.marketTicks.length - 1];
+        [...this.tickWaiters]
+            .filter(waiter => latest.sequence > waiter.afterSequence)
+            .forEach(waiter => waiter.done(latest));
         this.onTickForSignal?.();
         this.emitTick();
     }
@@ -306,7 +329,7 @@ export class BulkEngine {
                 if (!signal || !this.running) break;
 
                 const stake = nextStake(this.config, this.stats.lossStreak);
-                const cost = round2(stake * this.config.bulkSize);
+                const cost = round2(stake * effectiveBatchSize(this.config));
                 // Hard cap: never start a round that could take the cumulative loss past the max loss.
                 if (this.stats.net - cost < -this.config.maxLoss) {
                     this.fail(
@@ -349,7 +372,7 @@ export class BulkEngine {
             };
             const check = () => {
                 if (this.lastSignaledTickSequence === this.tickSequence) return;
-                const signal = this.strategy.evaluate(this.ticks);
+                const signal = this.strategy.evaluate(this.ticks, this.config);
                 this.lastScore = signal.score;
                 this.lastDiagnostics = signal.diagnostics ?? null;
                 this.signalStats.evaluations++;
@@ -373,7 +396,8 @@ export class BulkEngine {
                     timer = setTimeout(() => {
                         if (timer) this.timers.delete(timer);
                         if (!this.onTickForSignal) return; // already resolved
-                        if (this.ticks.length < this.strategy.minTicks) {
+                        const minimum = this.strategy.batchSize?.(this.config) ?? this.strategy.minTicks;
+                        if (this.ticks.length < minimum) {
                             arm(); // not enough real ticks yet: keep waiting
                             return;
                         }
@@ -403,21 +427,185 @@ export class BulkEngine {
             duration: spec.duration,
             duration_unit: spec.duration_unit,
             underlying_symbol: this.config.symbol,
+            ...(spec.barrier !== undefined ? { barrier: spec.barrier } : {}),
             ...(spec.selected_tick !== undefined ? { selected_tick: spec.selected_tick } : {}),
         };
     }
 
+    private waitForNextTickAfter(afterSequence: number): Promise<MarketTick | null> {
+        const available = this.marketTicks.find(tick => tick.sequence > afterSequence);
+        if (available) return Promise.resolve(available);
+        return new Promise(resolve => {
+            let timer: ReturnType<typeof setTimeout>;
+            const waiter = {
+                afterSequence,
+                done: (tick: MarketTick | null) => {
+                    this.tickWaiters.delete(waiter);
+                    clearTimeout(timer);
+                    this.timers.delete(timer);
+                    resolve(tick);
+                },
+            };
+            this.tickWaiters.add(waiter);
+            timer = setTimeout(() => waiter.done(null), this.settleTimeoutMs);
+            this.timers.add(timer);
+            if (!this.running) waiter.done(null);
+        });
+    }
+
+    private async playIntentLive(stake: number, intents: TradeIntent[]): Promise<RoundOutcome> {
+        const settled = await Promise.allSettled(
+            intents.map(intent => this.api.send({
+                buy: '1',
+                price: stake,
+                parameters: this.contractParams(stake, intent.spec),
+            }))
+        );
+        const errors: string[] = [];
+        const tradeResults: TradeResult[] = [];
+        const purchased: Array<{ index: number; intent: TradeIntent; id: number; payout: number | null }> = [];
+
+        settled.forEach((item, index) => {
+            const intent = intents[index];
+            if (item.status === 'rejected') {
+                const message = item.reason instanceof Error ? item.reason.message : String(item.reason);
+                errors.push(message);
+                tradeResults[index] = {
+                    status: 'failed', sourceDigit: intent.sourceDigit, barrier: intent.spec.barrier,
+                    stake, payout: null, profit: 0, message,
+                };
+                return;
+            }
+            const response = item.value;
+            const contractId = Number(response?.buy?.contract_id);
+            if (response?.error || !Number.isFinite(contractId)) {
+                const message = response?.error?.message || response?.error?.code || 'Deriv returned no contract.';
+                errors.push(message);
+                tradeResults[index] = {
+                    status: 'failed', sourceDigit: intent.sourceDigit, barrier: intent.spec.barrier,
+                    stake, payout: null, profit: 0, message,
+                };
+                return;
+            }
+            const payoutValue = Number(response?.buy?.payout);
+            const payout = Number.isFinite(payoutValue) ? payoutValue : null;
+            this.noteRatio(Number(response.buy.buy_price), payoutValue);
+            purchased.push({ index, intent, id: contractId, payout });
+        });
+
+        const outcomes = await Promise.all(purchased.map(async item => {
+            const outcome = await this.trackContract(item.id);
+            tradeResults[item.index] = {
+                status: outcome.status,
+                sourceDigit: item.intent.sourceDigit,
+                barrier: item.intent.spec.barrier,
+                contractId: item.id,
+                stake,
+                payout: item.payout,
+                profit: outcome.profit,
+            };
+            return outcome;
+        }));
+
+        return { outcomes, placed: purchased.length, errors, failed: errors.length, tradeResults };
+    }
+
+    private async playIntentPaper(stake: number, intents: TradeIntent[]): Promise<RoundOutcome> {
+        const quotes = await Promise.allSettled(
+            intents.map(async intent => {
+                const response = await this.api.send({ proposal: 1, ...this.contractParams(stake, intent.spec) });
+                const payout = Number(response?.proposal?.payout);
+                const ask = Number(response?.proposal?.ask_price);
+                const valid = !response?.error && Number.isFinite(payout) && Number.isFinite(ask) && payout > 0 && ask > 0;
+                const entrySequence = this.tickSequence;
+                return {
+                    response,
+                    payout,
+                    ask,
+                    settlement: valid ? this.waitForNextTickAfter(entrySequence) : null,
+                };
+            })
+        );
+        const errors: string[] = [];
+        const tradeResults: TradeResult[] = [];
+        const priced: Array<{
+            index: number;
+            intent: TradeIntent;
+            ask: number;
+            payout: number;
+            settlement: Promise<MarketTick | null>;
+        }> = [];
+
+        quotes.forEach((item, index) => {
+            const intent = intents[index];
+            const quote = item.status === 'fulfilled' ? item.value : null;
+            const response = quote?.response;
+            const payout = quote?.payout ?? NaN;
+            const ask = quote?.ask ?? NaN;
+            if (item.status === 'rejected' || response?.error || !Number.isFinite(payout) || !Number.isFinite(ask) || payout <= 0 || ask <= 0) {
+                const message = item.status === 'rejected'
+                    ? item.reason instanceof Error ? item.reason.message : String(item.reason)
+                    : response?.error?.message || 'Deriv returned no usable quote.';
+                errors.push(message);
+                tradeResults[index] = {
+                    status: 'failed', sourceDigit: intent.sourceDigit, barrier: intent.spec.barrier,
+                    stake, payout: null, profit: 0, message,
+                };
+                return;
+            }
+            this.noteRatio(ask, payout);
+            priced.push({ index, intent, ask, payout, settlement: quote!.settlement! });
+        });
+
+        if (!this.running || priced.length === 0) {
+            return { outcomes: [], placed: 0, errors, failed: errors.length, tradeResults };
+        }
+
+        const outcomes = await Promise.all(priced.map(async item => {
+            const settlementTick = await item.settlement;
+            if (!settlementTick) {
+                tradeResults[item.index] = {
+                    status: 'interrupted', sourceDigit: item.intent.sourceDigit, barrier: item.intent.spec.barrier,
+                    stake, payout: item.payout, profit: 0, message: 'Settlement tick was not confirmed.',
+                };
+                return { status: 'interrupted' as const, profit: 0 };
+            }
+            const won = this.strategy.settleIntent?.([settlementTick], item.intent);
+            if (won === undefined) {
+                tradeResults[item.index] = {
+                    status: 'interrupted', sourceDigit: item.intent.sourceDigit, barrier: item.intent.spec.barrier,
+                    stake, payout: item.payout, profit: 0, message: 'The contract settlement digit could not be calculated.',
+                };
+                return { status: 'interrupted' as const, profit: 0 };
+            }
+            const profit = won ? round2(item.payout - item.ask) : round2(-item.ask);
+            tradeResults[item.index] = {
+                status: won ? 'won' : 'lost', sourceDigit: item.intent.sourceDigit,
+                barrier: item.intent.spec.barrier, stake, payout: item.payout, profit,
+            };
+            return { status: won ? ('won' as const) : ('lost' as const), profit };
+        }));
+        return { outcomes, placed: priced.length, errors, failed: errors.length, tradeResults };
+    }
+
     private async playRound(signal: SignalResult, stake: number) {
         const startedAt = this.now();
-        const spec = this.strategy.contract(this.config);
         const roundNumber = this.stats.rounds + 1;
-
-        const result =
-            this.config.mode === 'live' ? await this.playLive(stake, spec) : await this.playPaper(stake, spec);
+        const intents = this.strategy.createTradeIntents?.(this.marketTicks, this.config);
+        if (intents && intents.length === 0) return;
+        const spec = intents ? null : this.strategy.contract(this.config);
+        const result = intents
+            ? this.config.mode === 'live'
+                ? await this.playIntentLive(stake, intents)
+                : await this.playIntentPaper(stake, intents)
+            : this.config.mode === 'live'
+              ? await this.playLive(stake, spec!)
+              : await this.playPaper(stake, spec!);
 
         const won = result.outcomes.filter(o => o.status === 'won').length;
         const lost = result.outcomes.filter(o => o.status === 'lost').length;
         const interrupted = result.outcomes.filter(o => o.status === 'interrupted').length;
+        const failed = result.failed ?? result.errors.length;
         const net = round2(result.outcomes.reduce((sum, o) => sum + (o.status === 'interrupted' ? 0 : o.profit), 0));
 
         const notes: string[] = [];
@@ -432,19 +620,20 @@ export class BulkEngine {
         result.errors.forEach(message => notes.push(`Buy failed: ${message}`));
 
         // A round with nothing placed is not a round (for example a failed proposal).
-        if (result.placed === 0 && result.errors.length === 0 && interrupted === 0) return;
+        if (result.placed === 0 && failed === 0 && interrupted === 0) return;
 
         this.stats.rounds = roundNumber;
         this.stats.won += won;
         this.stats.lost += lost;
         this.stats.interrupted += interrupted;
+        this.stats.failed += failed;
         this.stats.net = round2(this.stats.net + net);
         if (!signal.testingOnly) {
             this.stats.modelWon += won;
             this.stats.modelLost += lost;
         }
 
-        if (interrupted === 0 && result.errors.length === 0) {
+        if (interrupted === 0 && result.outcomes.length > 0) {
             if (net < 0) {
                 this.stats.lossStreak += 1;
                 this.stats.worstStreak = Math.max(this.stats.worstStreak, this.stats.lossStreak);
@@ -459,6 +648,8 @@ export class BulkEngine {
             mode: this.config.mode,
             symbol: this.config.symbol,
             contracts: result.placed,
+            failed,
+            tradeResults: result.tradeResults,
             stake,
             cost: round2(stake * result.placed),
             won,
@@ -473,7 +664,7 @@ export class BulkEngine {
         this.logs.push(log);
         this.events.onRound?.({ ...log });
 
-        if (result.errors.length > 0) this.fail(`Buy failed: ${result.errors[0]}`);
+        if (result.errors.length > 0 && !intents) this.fail(`Buy failed: ${result.errors[0]}`);
         else if (interrupted > 0 && this.running) {
             this.fail('A contract result could not be confirmed, so the run was stopped. Check Reports on Deriv.');
         }

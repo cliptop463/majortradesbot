@@ -15,6 +15,8 @@ export interface BulkConfig {
     risk: Risk;
     /** Contracts fired in parallel per round (1 to 10). */
     bulkSize: number;
+    /** Historical digits used by Last-Ticks Matches (1 to 10). */
+    matchesTickCount: number;
     /** Stake per contract. */
     stake: number;
     profitTarget: number;
@@ -33,6 +35,29 @@ export interface ContractSpec {
     duration: number;
     duration_unit: 't';
     selected_tick?: number;
+    barrier?: string;
+}
+
+export interface MarketTick {
+    quote: number;
+    pipSize: number | null;
+    sequence: number;
+}
+
+export interface TradeIntent {
+    spec: ContractSpec;
+    sourceDigit?: number;
+}
+
+export interface TradeResult {
+    status: 'won' | 'lost' | 'interrupted' | 'failed';
+    sourceDigit?: number;
+    barrier?: string;
+    contractId?: number;
+    stake: number;
+    payout: number | null;
+    profit: number;
+    message?: string;
 }
 
 export interface SignalResult {
@@ -80,9 +105,15 @@ export interface BulkStrategy {
     /** Ticks after entry that decide the contract. */
     ticksToSettle: number;
     contract(config: BulkConfig): ContractSpec;
-    evaluate(ticks: readonly number[]): SignalResult;
+    evaluate(ticks: readonly number[], config?: BulkConfig): SignalResult;
     /** Paper settlement from REAL ticks after entry. undefined while there are too few ticks. */
     settle(ticksAfterEntry: readonly number[], spec: ContractSpec): boolean | undefined;
+    /** Optional per-contract instructions for strategies whose batch contains different specs. */
+    createTradeIntents?(ticks: readonly MarketTick[], config: BulkConfig): TradeIntent[];
+    /** Optional precision-aware settlement for independently configured contracts. */
+    settleIntent?(ticksAfterEntry: readonly MarketTick[], intent: TradeIntent): boolean | undefined;
+    /** Optional contract count used by risk validation and exposure limits. */
+    batchSize?(config: BulkConfig): number;
 }
 
 /** Minimal surface of the existing Deriv connection that the engine needs. */
@@ -101,6 +132,10 @@ export interface RoundLog {
     symbol: string;
     /** Contracts placed (or paper contracts) in this round. */
     contracts: number;
+    /** Purchases or paper quotes that failed before becoming open contracts. */
+    failed: number;
+    /** Per-intent result records for strategies that use independent contract specs. */
+    tradeResults?: TradeResult[];
     stake: number;
     /** contracts x stake. */
     cost: number;
@@ -124,6 +159,7 @@ export interface Summary {
     contractsWon: number;
     contractsLost: number;
     contractsInterrupted: number;
+    contractsFailed: number;
     /** Per-contract win rate (0 to 1), or null when nothing settled. */
     winRate: number | null;
     net: number;
