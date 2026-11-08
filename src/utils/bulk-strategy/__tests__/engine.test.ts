@@ -359,36 +359,37 @@ describe('live mode', () => {
             parameters: { contract_type: 'TICKHIGH', selected_tick: 5, duration: 5, duration_unit: 't', amount: 1, underlying_symbol: 'R_100' },
         });
 
-        it('does not re-fire a signal for the same tick snapshot after an immediately settled round', async () => {
-            let evaluations = 0;
-            const oneSignal: BulkStrategy = {
-                ...alwaysTrade,
-                evaluate: () => {
-                    evaluations++;
-                    return { trade: true, score: 0.9, reason: 'test signal' };
-                },
-            };
-            const { api, engine } = setup(liveCfg({ bulkSize: 1 }), { strategy: oneSignal });
-            api.responders.unshift(req =>
-                req.proposal_open_contract
-                    ? {
-                          subscription: { id: 'already-sold' },
-                          proposal_open_contract: { contract_id: req.contract_id, is_sold: 1, profit: 2.5 },
-                      }
-                    : undefined
-            );
-            await engine.start();
-            await flush(12);
-
-            expect(evaluations).toBe(1);
-            expect(buys(api)).toHaveLength(1);
-            await engine.stop();
-        });
         const stopped = engine.stop();
         gates.forEach(open => open(null)); // the buys complete AFTER Stop was requested
         await stopped; // must not hang waiting for contracts it was told to stop following
         expect(engine.getSummary().contractsInterrupted).toBe(4);
         expect(api.count(r => r.proposal_open_contract)).toBe(0); // and it never started following them
+    });
+
+    it('does not re-fire a signal for the same tick snapshot after an immediately settled round', async () => {
+        let evaluations = 0;
+        const oneSignal: BulkStrategy = {
+            ...alwaysTrade,
+            evaluate: () => {
+                evaluations++;
+                return { trade: true, score: 0.9, reason: 'test signal' };
+            },
+        };
+        const { api, engine } = setup(liveCfg({ bulkSize: 1 }), { strategy: oneSignal });
+        api.responders.unshift(req =>
+            req.proposal_open_contract
+                ? {
+                      subscription: { id: 'already-sold' },
+                      proposal_open_contract: { contract_id: req.contract_id, is_sold: 1, profit: 2.5 },
+                  }
+                : undefined
+        );
+        await engine.start();
+        await flush(12);
+
+        expect(evaluations).toBe(1);
+        expect(buys(api)).toHaveLength(1);
+        await engine.stop();
     });
 
     it('follows each contract with proposal_open_contract and sums real profits', async () => {
@@ -503,7 +504,7 @@ describe('signal gating with the real Tick Striker', () => {
         expect(proposals(api)).toHaveLength(1);
         feed(api, WIN);
         await flush();
-        expect(rounds[0].note).toContain('trading anyway');
+        expect(rounds[0].note).toContain('TESTING ONLY');
         await engine.stop();
     });
 

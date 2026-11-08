@@ -95,13 +95,14 @@ describe('Tick Striker model score', () => {
         expect(result.score).toBeGreaterThanOrEqual(0);
         expect(result.score).toBeLessThanOrEqual(1);
         expect(result.reason).toContain('Uncalibrated TICKHIGH model score');
-        expect(result.trade).toBe(result.score! >= 0.5);
+        expect(result.trade).toBe(result.score! >= result.diagnostics!.entryThreshold);
         expect(result.diagnostics).toMatchObject({
             tickCount: BUFFER_SIZE,
             trainingSampleCount: expect.any(Number),
             modelTrained: true,
-            entryThreshold: THRESHOLD,
         });
+        // Default entry rule: the model's own baseline, which is the share of past windows that won.
+        expect(result.diagnostics!.entryThreshold).toBeCloseTo(result.diagnostics!.positiveOutcomeRate as number);
         expect(result.diagnostics?.positiveOutcomeRate).toBeCloseTo(
             result.diagnostics!.positiveExamples / result.diagnostics!.trainingSampleCount
         );
@@ -182,5 +183,58 @@ describe('Tick Striker paper settlement', () => {
 
     it('rejects an invalid selected tick rather than settling a different contract', () => {
         expect(settle([100, 101, 102, 103, 104], { ...spec, selected_tick: 6 })).toBe(false);
+    });
+});
+
+describe('Tick Striker entry rule (why signals now appear)', () => {
+    const rng = (seed: number) => () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+    const gauss = (r: () => number) => Math.sqrt(-2 * Math.log(r() || 1e-12)) * Math.cos(2 * Math.PI * r());
+    const walk = (n: number, seed: number) => {
+        const r = rng(seed);
+        let price = 1000;
+        return Array.from({ length: n }, () => Number((price += gauss(r) * 0.35).toFixed(2)));
+    };
+    const windows = (ticks: number[], count: number) =>
+        Array.from({ length: count }, (_, i) => ticks.slice(i * 40, i * 40 + BUFFER_SIZE));
+
+    it('by default enters when the score reaches the model baseline (the share of past windows that won)', () => {
+        const result = evaluate(walk(BUFFER_SIZE, 5));
+        const baseline = result.diagnostics!.positiveOutcomeRate as number;
+        expect(baseline).toBeGreaterThan(0.2);
+        expect(baseline).toBeLessThan(0.35); // the contract wins about 27% of the time on random ticks
+        expect(result.diagnostics!.entryThreshold).toBeCloseTo(baseline);
+        expect(result.trade).toBe(result.score! >= baseline);
+    });
+
+    it('signals do appear on random ticks: roughly half the evaluations', () => {
+        const wins = windows(walk(BUFFER_SIZE + 40 * 39, 11), 40).map(w => evaluate(w));
+        const share = wins.filter(r => r.trade).length / wins.length;
+        expect(share).toBeGreaterThan(0.25);
+        expect(share).toBeLessThan(0.75);
+    });
+
+    it('a fixed 0.50 threshold never fires, which is why no signals showed up', () => {
+        const results = windows(walk(BUFFER_SIZE + 40 * 39, 11), 40).map(w => evaluate(w, THRESHOLD));
+        expect(Math.max(...results.map(r => r.score as number))).toBeLessThan(0.5);
+        expect(results.some(r => r.trade)).toBe(false);
+        expect(results[0].diagnostics!.entryThreshold).toBe(0.5);
+    });
+
+    it('still honours an explicit threshold', () => {
+        const ticks = walk(BUFFER_SIZE, 5);
+        expect(evaluate(ticks, 0).trade).toBe(true);
+        expect(evaluate(ticks, 1).trade).toBe(false);
+        expect(evaluate(ticks, 0.3).diagnostics!.entryThreshold).toBe(0.3);
+    });
+
+    it('rejects an invalid explicit threshold', () => {
+        const ticks = walk(BUFFER_SIZE, 5);
+        expect(evaluate(ticks, -1).diagnostics?.rejectionCode).toBe('invalid_threshold');
+        expect(evaluate(ticks, 2).diagnostics?.rejectionCode).toBe('invalid_threshold');
+        expect(evaluate(ticks, Number.NaN).diagnostics?.rejectionCode).toBe('invalid_threshold');
+    });
+
+    it('does not pretend the entry rule changes the odds: it is documented in the strategy text', () => {
+        expect(tickStriker.description).toContain('does not change the odds');
     });
 });

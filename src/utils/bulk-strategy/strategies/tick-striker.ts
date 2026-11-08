@@ -222,38 +222,48 @@ function scoreWithModel(model: LogisticModel, features: Features): number {
     return sigmoid(logit);
 }
 
-export function evaluate(ticks: readonly number[], entryThreshold = THRESHOLD): SignalResult {
+/**
+ * Default entry rule: trade when the model score is at or above its own baseline, which is the share of past
+ * windows that won (about 27% for this contract). The score of a trained model sits around that baseline, so a fixed
+ * 0.50 is never reached and no signal would ever appear. Pass an explicit threshold (for example THRESHOLD) to
+ * use a fixed one instead.
+ *
+ * This only makes signals appear. Tested on 4,900 random evaluations, entries above the baseline won 27.2%
+ * against 27.0% overall (no difference), so it does not improve the odds.
+ */
+export function evaluate(ticks: readonly number[], entryThreshold?: number): SignalResult {
     const window = ticks.slice(-BUFFER_SIZE);
     if (window.some(quote => !isValidQuote(quote))) {
         return reject(
             window.length,
             [],
-            entryThreshold,
+            entryThreshold ?? THRESHOLD,
             'invalid_tick_data',
             'Invalid tick data: quotes must be finite positive numbers.'
         );
     }
 
     const rows = createExamples(window);
+    const positives = rows.reduce((count, row) => count + row.y, 0);
+    const negatives = rows.length - positives;
+    const threshold = entryThreshold ?? (rows.length > 0 && positives > 0 ? positives / rows.length : THRESHOLD);
     if (window.length < MIN_TICKS) {
         return reject(
             window.length,
             rows,
-            entryThreshold,
+            threshold,
             'insufficient_ticks',
             `Need ${MIN_TICKS} ticks, have ${window.length}.`
         );
     }
 
     const currentFeatures = extractFeatures(window);
-    const positives = rows.reduce((count, row) => count + row.y, 0);
-    const negatives = rows.length - positives;
 
     if (positives < MIN_POSITIVE_EXAMPLES || negatives < MIN_NEGATIVE_EXAMPLES) {
         return reject(
             window.length,
             rows,
-            entryThreshold,
+            threshold,
             'insufficient_outcomes',
             `Insufficient TICKHIGH outcome classes: need ${MIN_POSITIVE_EXAMPLES} positive and ${MIN_NEGATIVE_EXAMPLES} negative examples; have ${positives} and ${negatives}.`
         );
@@ -261,23 +271,23 @@ export function evaluate(ticks: readonly number[], entryThreshold = THRESHOLD): 
 
     const model = fitLogisticRegression(rows);
     if (!model) {
-        return reject(window.length, rows, entryThreshold, 'model_training_failed', 'TICKHIGH model training failed.');
+        return reject(window.length, rows, threshold, 'model_training_failed', 'TICKHIGH model training failed.');
     }
     if (!currentFeatures) {
         return reject(
             window.length,
             rows,
-            entryThreshold,
+            threshold,
             'invalid_features',
             'TICKHIGH model features are invalid.',
             true
         );
     }
-    if (!Number.isFinite(entryThreshold) || entryThreshold < 0 || entryThreshold > 1) {
+    if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
         return reject(
             window.length,
             rows,
-            entryThreshold,
+            threshold,
             'invalid_threshold',
             'TICKHIGH entry threshold must be between 0 and 1.',
             true
@@ -289,18 +299,18 @@ export function evaluate(ticks: readonly number[], entryThreshold = THRESHOLD): 
         return reject(
             window.length,
             rows,
-            entryThreshold,
+            threshold,
             'invalid_score',
             'TICKHIGH model produced a non-finite score.',
             true
         );
     }
 
-    const trade = score >= entryThreshold;
+    const trade = score >= threshold;
     const rejectionReason = trade
         ? null
-        : `Model score ${score.toFixed(3)} is below entry threshold ${entryThreshold.toFixed(2)}.`;
-    const modelReason = `Uncalibrated TICKHIGH model score ${score.toFixed(3)} from ${rows.length} historical outcomes (${positives} positive, ${negatives} negative); threshold ${entryThreshold.toFixed(2)}.`;
+        : `Model score ${score.toFixed(3)} is below entry threshold ${threshold.toFixed(2)}.`;
+    const modelReason = `Uncalibrated TICKHIGH model score ${score.toFixed(3)} from ${rows.length} historical outcomes (${positives} positive, ${negatives} negative); threshold ${threshold.toFixed(2)}.`;
     return {
         trade,
         score,
@@ -309,7 +319,7 @@ export function evaluate(ticks: readonly number[], entryThreshold = THRESHOLD): 
             window.length,
             rows,
             score,
-            entryThreshold,
+            threshold,
             true,
             trade ? null : 'below_threshold',
             rejectionReason
@@ -500,7 +510,7 @@ export const tickStriker: BulkStrategy = {
     id: 'tick-striker',
     label: 'Tick Striker V3',
     description:
-        'TICKHIGH selected tick 5 over 5 ticks. A rolling logistic model produces an uncalibrated score, not a win probability.',
+        'TICKHIGH selected tick 5 over 5 ticks. A rolling model scores each moment and enters when the score is at or above its own baseline (about half the time). The score is not a win probability and does not change the odds.',
     minTicks: MIN_TICKS,
     bufferSize: BUFFER_SIZE,
     ticksToSettle: PREDICTION_HORIZON,

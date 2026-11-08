@@ -757,7 +757,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                     })}
                                 </p>
                                 <p>
-                                    {localize('Model {{trained}} · score {{score}} · entry threshold {{threshold}}', {
+                                    {localize('Model {{trained}} · score {{score}} · entry threshold {{threshold}} (its own baseline)', {
                                         trained: tick_info.diagnostics.modelTrained ? localize('trained') : localize('not trained'),
                                         score:
                                             tick_info.diagnostics.currentModelScore === null
@@ -768,7 +768,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                 </p>
                                 <p>
                                     {localize(
-                                        'The score is uncalibrated, not a win probability. The production threshold stays at 0.50 until actual chronological ticks and Deriv payout quotes support a different value.'
+                                        'The score is uncalibrated, not a win probability. Entries happen when the score reaches its own baseline (about half the time), so signals appear. This does not improve the odds: in testing on random ticks, entries above the baseline won as often as any other round.'
                                     )}
                                 </p>
                                 <p>
