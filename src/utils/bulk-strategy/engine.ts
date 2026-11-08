@@ -33,6 +33,11 @@ import type {
 
 const SETTLE_TIMEOUT_MS = 120_000;
 const round2 = (x: number) => Math.round(x * 100) / 100;
+const parsePipSize = (value: unknown): number | null => {
+    if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null;
+    const pipSize = Number(value);
+    return Number.isInteger(pipSize) && pipSize >= 0 && pipSize <= 12 ? pipSize : null;
+};
 
 interface ContractOutcome {
     status: 'won' | 'lost' | 'interrupted';
@@ -73,6 +78,7 @@ export class BulkEngine {
     private lastScore: number | null = null;
     private lastDiagnostics: SignalDiagnostics | null = null;
     private tickSequence = 0;
+    private matchesFreshAfterSequence: number | null = null;
     private lastSignaledTickSequence: number | null = null;
     private signalStats: SignalEvaluationStats = {
         evaluations: 0,
@@ -253,7 +259,7 @@ export class BulkEngine {
     private seed(response: any) {
         const prices: unknown[] = Array.isArray(response?.history?.prices) ? response.history.prices : [];
         const pipSizeValue = response?.history?.pip_size ?? response?.pip_size ?? response?.tick?.pip_size;
-        const pipSize = Number.isInteger(Number(pipSizeValue)) ? Number(pipSizeValue) : null;
+        const pipSize = parsePipSize(pipSizeValue);
         prices.forEach(price => {
             const quote = Number(price);
             if (Number.isFinite(quote)) {
@@ -274,7 +280,7 @@ export class BulkEngine {
             const own = this.tickSubId
                 ? data.subscription?.id === this.tickSubId
                 : this.passiveTicks && data.tick.symbol === this.config.symbol;
-                if (own) this.pushTick(Number(data.tick.quote), data.tick.pip_size);
+            if (own) this.pushTick(Number(data.tick.quote), data.tick.pip_size);
         } else if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
             const poc = data.proposal_open_contract;
             const waiter = this.pocWaiters.get(Number(poc.contract_id));
@@ -284,7 +290,7 @@ export class BulkEngine {
 
     private pushTick(quote: number, pipSizeValue?: unknown) {
         if (!Number.isFinite(quote)) return;
-        const pipSize = Number.isInteger(Number(pipSizeValue)) ? Number(pipSizeValue) : null;
+        const pipSize = parsePipSize(pipSizeValue);
         this.ticks.push(quote);
         this.marketTicks.push({ quote, pipSize, sequence: this.tickSequence + 1 });
         this.ticksSeen++;
@@ -308,7 +314,7 @@ export class BulkEngine {
     private emitTick() {
         this.events.onTick?.({
             last: this.ticks[this.ticks.length - 1] ?? NaN,
-            ticks: this.ticks.length,
+            ticks: this.getEvaluationTicks().length,
             ticksSeen: this.ticksSeen,
             score: this.lastScore,
             diagnostics: this.lastDiagnostics,
@@ -317,6 +323,13 @@ export class BulkEngine {
                 rejectionsByReason: { ...this.signalStats.rejectionsByReason },
             },
         });
+    }
+
+    private getEvaluationTicks(): number[] {
+        if (!this.strategy.createTradeIntents || this.matchesFreshAfterSequence === null) return this.ticks;
+        return this.marketTicks
+            .filter(tick => tick.sequence > this.matchesFreshAfterSequence!)
+            .map(tick => tick.quote);
     }
 
     // ───────────────────────── main loop ─────────────────────────
@@ -372,7 +385,7 @@ export class BulkEngine {
             };
             const check = () => {
                 if (this.lastSignaledTickSequence === this.tickSequence) return;
-                const signal = this.strategy.evaluate(this.ticks, this.config);
+                const signal = this.strategy.evaluate(this.getEvaluationTicks(), this.config);
                 this.lastScore = signal.score;
                 this.lastDiagnostics = signal.diagnostics ?? null;
                 this.signalStats.evaluations++;
@@ -397,7 +410,7 @@ export class BulkEngine {
                         if (timer) this.timers.delete(timer);
                         if (!this.onTickForSignal) return; // already resolved
                         const minimum = this.strategy.batchSize?.(this.config) ?? this.strategy.minTicks;
-                        if (this.ticks.length < minimum) {
+                        if (this.getEvaluationTicks().length < minimum) {
                             arm(); // not enough real ticks yet: keep waiting
                             return;
                         }
@@ -591,7 +604,10 @@ export class BulkEngine {
     private async playRound(signal: SignalResult, stake: number) {
         const startedAt = this.now();
         const roundNumber = this.stats.rounds + 1;
-        const intents = this.strategy.createTradeIntents?.(this.marketTicks, this.config);
+        const intentTicks = this.matchesFreshAfterSequence === null
+            ? this.marketTicks
+            : this.marketTicks.filter(tick => tick.sequence > this.matchesFreshAfterSequence!);
+        const intents = this.strategy.createTradeIntents?.(intentTicks, this.config);
         if (intents && intents.length === 0) return;
         const spec = intents ? null : this.strategy.contract(this.config);
         const result = intents
@@ -601,6 +617,7 @@ export class BulkEngine {
             : this.config.mode === 'live'
               ? await this.playLive(stake, spec!)
               : await this.playPaper(stake, spec!);
+          if (intents) this.matchesFreshAfterSequence = this.tickSequence;
 
         const won = result.outcomes.filter(o => o.status === 'won').length;
         const lost = result.outcomes.filter(o => o.status === 'lost').length;
@@ -617,7 +634,9 @@ export class BulkEngine {
                 }.`
             );
         }
-        result.errors.forEach(message => notes.push(`Buy failed: ${message}`));
+        result.errors.forEach(message =>
+            notes.push(`${this.config.mode === 'live' ? 'Purchase failed' : 'Quote failed'}: ${message}`)
+        );
 
         // A round with nothing placed is not a round (for example a failed proposal).
         if (result.placed === 0 && failed === 0 && interrupted === 0) return;

@@ -125,7 +125,7 @@ describe('validation', () => {
                 'Number of recent tick digits must be a whole number from 1 to 10.'
             );
         }
-        expect(validateConfig(cfg({ strategyId: 'last-ticks-matches', matchesTickCount: 10 }))).toEqual([]);
+        expect(validateConfig(cfg({ strategyId: 'last-ticks-matches', matchesTickCount: 10, maxLoss: 30 }))).toEqual([]);
     });
 
     it('rejects non-positive money fields and an unknown market or strategy', () => {

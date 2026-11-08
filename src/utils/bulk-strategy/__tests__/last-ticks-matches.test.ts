@@ -84,6 +84,7 @@ describe('Last-Ticks Matches strategy', () => {
         expect(extractFinalDigit({ quote: 123.45, pipSize: 2 })).toBe(5);
         expect(extractFinalDigit({ quote: 123.4, pipSize: 2 })).toBe(0);
         expect(extractFinalDigit({ quote: 123.456, pipSize: 3 })).toBe(6);
+        expect(extractFinalDigit({ quote: 1.005, pipSize: 3 })).toBe(5);
         expect(extractFinalDigit({ quote: 123.4, pipSize: null })).toBeNull();
     });
 
@@ -179,6 +180,12 @@ describe('Last-Ticks Matches engine batches', () => {
 
         api.emit({ msg_type: 'proposal_open_contract', proposal_open_contract: { contract_id: 102, is_sold: 1, profit: -1, status: 'lost' } });
         await flush();
+        expect(api.sent.filter(request => request.buy)).toHaveLength(2);
+        emitTick(api, 3);
+        await flush();
+        expect(api.sent.filter(request => request.buy)).toHaveLength(2);
+        emitTick(api, 4);
+        await flush();
         const buys = api.sent.filter(request => request.buy);
         expect(buys).toHaveLength(4);
         expect(buys.slice(2).map(request => request.parameters.barrier)).toEqual(['3', '4']);
@@ -188,23 +195,34 @@ describe('Last-Ticks Matches engine batches', () => {
     it('records a failed purchase without treating it as open or losing the successful contract', async () => {
         const api = new FakeApi();
         const rounds: any[] = [];
+        const errors: string[] = [];
         api.responders.push(request => {
             if (request.ticks_history) return { history: { prices: [10.1, 10.2], pip_size: 1 }, subscription: { id: 'tick-sub' } };
-            if (request.proposal) {
-                return request.barrier === '1'
-                    ? { proposal: { payout: 2, ask_price: 1 } }
-                    : { error: { code: 'NoQuote', message: 'No quote for barrier.' } };
+            if (request.buy) {
+                return request.parameters.barrier === '1'
+                    ? { buy: { contract_id: 501, buy_price: 1, payout: 2 } }
+                    : { error: { code: 'PurchaseFailed', message: 'Purchase failed.' } };
+            }
+            if (request.proposal_open_contract) {
+                return { subscription: { id: 'poc-501' }, proposal_open_contract: { contract_id: 501, is_sold: 0 } };
             }
             return undefined;
         });
-        const engine = new BulkEngine(engineConfig({ maxRounds: 1 }), api, { onRound: round => rounds.push(round) });
+        const engine = new BulkEngine(
+            engineConfig({ mode: 'live', maxRounds: 1 }),
+            api,
+            { onRound: round => rounds.push(round), onError: message => errors.push(message) }
+        );
         await engine.start();
         await flush();
-        expect(api.sent.filter(request => request.proposal)).toHaveLength(2);
-        emitTick(api, 1);
+        expect(api.sent.filter(request => request.buy)).toHaveLength(2);
+        expect(api.sent.filter(request => request.proposal_open_contract)).toHaveLength(1);
+        api.emit({ msg_type: 'proposal_open_contract', proposal_open_contract: { contract_id: 501, is_sold: 1, profit: 1, status: 'won' } });
         await flush();
         expect(rounds[0]).toMatchObject({ contracts: 1, failed: 1, won: 1, lost: 0 });
         expect(rounds[0].tradeResults.map((result: any) => result.status)).toEqual(['won', 'failed']);
+        expect(engine.getSummary().contractsFailed).toBe(1);
+        expect(errors).toEqual([]);
         await engine.stop();
     });
 });

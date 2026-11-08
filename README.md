@@ -76,11 +76,13 @@ also regenerate brand CSS — see Branding below.)
 ## Running a bulk strategy
 
 1. Open **Bulk Strategy** from the bot builder toolbar.
-2. Choose a strategy and market, then set the stake, bulk size, profit target, and max loss. The risk presets and martingale settings are optional.
+2. Choose a strategy and market, then set the stake, bulk size, profit target, and max loss. Last-Ticks Matches has a separate **Number of Recent Tick Digits** setting (1–10, default 5); it creates one independent one-tick DIGITMATCH contract per selected digit, preserving duplicates.
 3. Keep **Paper** selected to test with live market quotes without placing orders, then choose **Start Paper test**. Starting uses and saves the values currently shown; the separate **Save** button is optional.
 4. Use **Start Live trading** only when you are ready to place real or Demo-account orders. Live mode requires an authorized account, and enabling a Real account requires a separate confirmation.
 
 The modal displays any setup or safety-limit problems that must be fixed before starting. Use **Stop** to end a run; contracts already bought remain open on Deriv.
+
+Last-Ticks Matches runs sequential batches: every successful contract in the current batch must settle before the next batch collects N fresh ticks. Paper mode quotes each barrier separately and settles each simulated contract from its own next tick.
 
 ## Step 4: Build for Production
 

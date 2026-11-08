@@ -9,8 +9,18 @@ export function extractFinalDigit(tick: Pick<MarketTick, 'quote' | 'pipSize'>): 
     if (!Number.isFinite(quote) || !Number.isInteger(pipSize) || pipSize === null || pipSize < 0 || pipSize > 12) {
         return null;
     }
-    const scaledQuote = Math.round(Math.abs(quote) * 10 ** pipSize);
-    return Number.isSafeInteger(scaledQuote) ? scaledQuote % 10 : null;
+    const [mantissa, exponentText = '0'] = Math.abs(quote).toString().toLowerCase().split('e');
+    const [integerPart, fractionalPart = ''] = mantissa.split('.');
+    const coefficient = BigInt(`${integerPart}${fractionalPart}`);
+    const scaleShift = pipSize + Number(exponentText) - fractionalPart.length;
+    let scaledQuote: bigint;
+    if (scaleShift >= 0) {
+        scaledQuote = coefficient * 10n ** BigInt(scaleShift);
+    } else {
+        const divisor = 10n ** BigInt(-scaleShift);
+        scaledQuote = (coefficient + divisor / 2n) / divisor;
+    }
+    return Number(scaledQuote % 10n);
 }
 
 export function validateMatchesTickCount(count: number): boolean {

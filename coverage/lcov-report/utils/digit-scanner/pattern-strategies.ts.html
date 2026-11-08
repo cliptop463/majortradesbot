@@ -1,0 +1,1933 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for utils/digit-scanner/pattern-strategies.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">utils/digit-scanner</a> pattern-strategies.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">99.83% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>615/616</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">96.01% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>337/351</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>38/38</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">99.83% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>615/616</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a>
+<a name='L357'></a><a href='#L357'>357</a>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a>
+<a name='L361'></a><a href='#L361'>361</a>
+<a name='L362'></a><a href='#L362'>362</a>
+<a name='L363'></a><a href='#L363'>363</a>
+<a name='L364'></a><a href='#L364'>364</a>
+<a name='L365'></a><a href='#L365'>365</a>
+<a name='L366'></a><a href='#L366'>366</a>
+<a name='L367'></a><a href='#L367'>367</a>
+<a name='L368'></a><a href='#L368'>368</a>
+<a name='L369'></a><a href='#L369'>369</a>
+<a name='L370'></a><a href='#L370'>370</a>
+<a name='L371'></a><a href='#L371'>371</a>
+<a name='L372'></a><a href='#L372'>372</a>
+<a name='L373'></a><a href='#L373'>373</a>
+<a name='L374'></a><a href='#L374'>374</a>
+<a name='L375'></a><a href='#L375'>375</a>
+<a name='L376'></a><a href='#L376'>376</a>
+<a name='L377'></a><a href='#L377'>377</a>
+<a name='L378'></a><a href='#L378'>378</a>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a>
+<a name='L381'></a><a href='#L381'>381</a>
+<a name='L382'></a><a href='#L382'>382</a>
+<a name='L383'></a><a href='#L383'>383</a>
+<a name='L384'></a><a href='#L384'>384</a>
+<a name='L385'></a><a href='#L385'>385</a>
+<a name='L386'></a><a href='#L386'>386</a>
+<a name='L387'></a><a href='#L387'>387</a>
+<a name='L388'></a><a href='#L388'>388</a>
+<a name='L389'></a><a href='#L389'>389</a>
+<a name='L390'></a><a href='#L390'>390</a>
+<a name='L391'></a><a href='#L391'>391</a>
+<a name='L392'></a><a href='#L392'>392</a>
+<a name='L393'></a><a href='#L393'>393</a>
+<a name='L394'></a><a href='#L394'>394</a>
+<a name='L395'></a><a href='#L395'>395</a>
+<a name='L396'></a><a href='#L396'>396</a>
+<a name='L397'></a><a href='#L397'>397</a>
+<a name='L398'></a><a href='#L398'>398</a>
+<a name='L399'></a><a href='#L399'>399</a>
+<a name='L400'></a><a href='#L400'>400</a>
+<a name='L401'></a><a href='#L401'>401</a>
+<a name='L402'></a><a href='#L402'>402</a>
+<a name='L403'></a><a href='#L403'>403</a>
+<a name='L404'></a><a href='#L404'>404</a>
+<a name='L405'></a><a href='#L405'>405</a>
+<a name='L406'></a><a href='#L406'>406</a>
+<a name='L407'></a><a href='#L407'>407</a>
+<a name='L408'></a><a href='#L408'>408</a>
+<a name='L409'></a><a href='#L409'>409</a>
+<a name='L410'></a><a href='#L410'>410</a>
+<a name='L411'></a><a href='#L411'>411</a>
+<a name='L412'></a><a href='#L412'>412</a>
+<a name='L413'></a><a href='#L413'>413</a>
+<a name='L414'></a><a href='#L414'>414</a>
+<a name='L415'></a><a href='#L415'>415</a>
+<a name='L416'></a><a href='#L416'>416</a>
+<a name='L417'></a><a href='#L417'>417</a>
+<a name='L418'></a><a href='#L418'>418</a>
+<a name='L419'></a><a href='#L419'>419</a>
+<a name='L420'></a><a href='#L420'>420</a>
+<a name='L421'></a><a href='#L421'>421</a>
+<a name='L422'></a><a href='#L422'>422</a>
+<a name='L423'></a><a href='#L423'>423</a>
+<a name='L424'></a><a href='#L424'>424</a>
+<a name='L425'></a><a href='#L425'>425</a>
+<a name='L426'></a><a href='#L426'>426</a>
+<a name='L427'></a><a href='#L427'>427</a>
+<a name='L428'></a><a href='#L428'>428</a>
+<a name='L429'></a><a href='#L429'>429</a>
+<a name='L430'></a><a href='#L430'>430</a>
+<a name='L431'></a><a href='#L431'>431</a>
+<a name='L432'></a><a href='#L432'>432</a>
+<a name='L433'></a><a href='#L433'>433</a>
+<a name='L434'></a><a href='#L434'>434</a>
+<a name='L435'></a><a href='#L435'>435</a>
+<a name='L436'></a><a href='#L436'>436</a>
+<a name='L437'></a><a href='#L437'>437</a>
+<a name='L438'></a><a href='#L438'>438</a>
+<a name='L439'></a><a href='#L439'>439</a>
+<a name='L440'></a><a href='#L440'>440</a>
+<a name='L441'></a><a href='#L441'>441</a>
+<a name='L442'></a><a href='#L442'>442</a>
+<a name='L443'></a><a href='#L443'>443</a>
+<a name='L444'></a><a href='#L444'>444</a>
+<a name='L445'></a><a href='#L445'>445</a>
+<a name='L446'></a><a href='#L446'>446</a>
+<a name='L447'></a><a href='#L447'>447</a>
+<a name='L448'></a><a href='#L448'>448</a>
+<a name='L449'></a><a href='#L449'>449</a>
+<a name='L450'></a><a href='#L450'>450</a>
+<a name='L451'></a><a href='#L451'>451</a>
+<a name='L452'></a><a href='#L452'>452</a>
+<a name='L453'></a><a href='#L453'>453</a>
+<a name='L454'></a><a href='#L454'>454</a>
+<a name='L455'></a><a href='#L455'>455</a>
+<a name='L456'></a><a href='#L456'>456</a>
+<a name='L457'></a><a href='#L457'>457</a>
+<a name='L458'></a><a href='#L458'>458</a>
+<a name='L459'></a><a href='#L459'>459</a>
+<a name='L460'></a><a href='#L460'>460</a>
+<a name='L461'></a><a href='#L461'>461</a>
+<a name='L462'></a><a href='#L462'>462</a>
+<a name='L463'></a><a href='#L463'>463</a>
+<a name='L464'></a><a href='#L464'>464</a>
+<a name='L465'></a><a href='#L465'>465</a>
+<a name='L466'></a><a href='#L466'>466</a>
+<a name='L467'></a><a href='#L467'>467</a>
+<a name='L468'></a><a href='#L468'>468</a>
+<a name='L469'></a><a href='#L469'>469</a>
+<a name='L470'></a><a href='#L470'>470</a>
+<a name='L471'></a><a href='#L471'>471</a>
+<a name='L472'></a><a href='#L472'>472</a>
+<a name='L473'></a><a href='#L473'>473</a>
+<a name='L474'></a><a href='#L474'>474</a>
+<a name='L475'></a><a href='#L475'>475</a>
+<a name='L476'></a><a href='#L476'>476</a>
+<a name='L477'></a><a href='#L477'>477</a>
+<a name='L478'></a><a href='#L478'>478</a>
+<a name='L479'></a><a href='#L479'>479</a>
+<a name='L480'></a><a href='#L480'>480</a>
+<a name='L481'></a><a href='#L481'>481</a>
+<a name='L482'></a><a href='#L482'>482</a>
+<a name='L483'></a><a href='#L483'>483</a>
+<a name='L484'></a><a href='#L484'>484</a>
+<a name='L485'></a><a href='#L485'>485</a>
+<a name='L486'></a><a href='#L486'>486</a>
+<a name='L487'></a><a href='#L487'>487</a>
+<a name='L488'></a><a href='#L488'>488</a>
+<a name='L489'></a><a href='#L489'>489</a>
+<a name='L490'></a><a href='#L490'>490</a>
+<a name='L491'></a><a href='#L491'>491</a>
+<a name='L492'></a><a href='#L492'>492</a>
+<a name='L493'></a><a href='#L493'>493</a>
+<a name='L494'></a><a href='#L494'>494</a>
+<a name='L495'></a><a href='#L495'>495</a>
+<a name='L496'></a><a href='#L496'>496</a>
+<a name='L497'></a><a href='#L497'>497</a>
+<a name='L498'></a><a href='#L498'>498</a>
+<a name='L499'></a><a href='#L499'>499</a>
+<a name='L500'></a><a href='#L500'>500</a>
+<a name='L501'></a><a href='#L501'>501</a>
+<a name='L502'></a><a href='#L502'>502</a>
+<a name='L503'></a><a href='#L503'>503</a>
+<a name='L504'></a><a href='#L504'>504</a>
+<a name='L505'></a><a href='#L505'>505</a>
+<a name='L506'></a><a href='#L506'>506</a>
+<a name='L507'></a><a href='#L507'>507</a>
+<a name='L508'></a><a href='#L508'>508</a>
+<a name='L509'></a><a href='#L509'>509</a>
+<a name='L510'></a><a href='#L510'>510</a>
+<a name='L511'></a><a href='#L511'>511</a>
+<a name='L512'></a><a href='#L512'>512</a>
+<a name='L513'></a><a href='#L513'>513</a>
+<a name='L514'></a><a href='#L514'>514</a>
+<a name='L515'></a><a href='#L515'>515</a>
+<a name='L516'></a><a href='#L516'>516</a>
+<a name='L517'></a><a href='#L517'>517</a>
+<a name='L518'></a><a href='#L518'>518</a>
+<a name='L519'></a><a href='#L519'>519</a>
+<a name='L520'></a><a href='#L520'>520</a>
+<a name='L521'></a><a href='#L521'>521</a>
+<a name='L522'></a><a href='#L522'>522</a>
+<a name='L523'></a><a href='#L523'>523</a>
+<a name='L524'></a><a href='#L524'>524</a>
+<a name='L525'></a><a href='#L525'>525</a>
+<a name='L526'></a><a href='#L526'>526</a>
+<a name='L527'></a><a href='#L527'>527</a>
+<a name='L528'></a><a href='#L528'>528</a>
+<a name='L529'></a><a href='#L529'>529</a>
+<a name='L530'></a><a href='#L530'>530</a>
+<a name='L531'></a><a href='#L531'>531</a>
+<a name='L532'></a><a href='#L532'>532</a>
+<a name='L533'></a><a href='#L533'>533</a>
+<a name='L534'></a><a href='#L534'>534</a>
+<a name='L535'></a><a href='#L535'>535</a>
+<a name='L536'></a><a href='#L536'>536</a>
+<a name='L537'></a><a href='#L537'>537</a>
+<a name='L538'></a><a href='#L538'>538</a>
+<a name='L539'></a><a href='#L539'>539</a>
+<a name='L540'></a><a href='#L540'>540</a>
+<a name='L541'></a><a href='#L541'>541</a>
+<a name='L542'></a><a href='#L542'>542</a>
+<a name='L543'></a><a href='#L543'>543</a>
+<a name='L544'></a><a href='#L544'>544</a>
+<a name='L545'></a><a href='#L545'>545</a>
+<a name='L546'></a><a href='#L546'>546</a>
+<a name='L547'></a><a href='#L547'>547</a>
+<a name='L548'></a><a href='#L548'>548</a>
+<a name='L549'></a><a href='#L549'>549</a>
+<a name='L550'></a><a href='#L550'>550</a>
+<a name='L551'></a><a href='#L551'>551</a>
+<a name='L552'></a><a href='#L552'>552</a>
+<a name='L553'></a><a href='#L553'>553</a>
+<a name='L554'></a><a href='#L554'>554</a>
+<a name='L555'></a><a href='#L555'>555</a>
+<a name='L556'></a><a href='#L556'>556</a>
+<a name='L557'></a><a href='#L557'>557</a>
+<a name='L558'></a><a href='#L558'>558</a>
+<a name='L559'></a><a href='#L559'>559</a>
+<a name='L560'></a><a href='#L560'>560</a>
+<a name='L561'></a><a href='#L561'>561</a>
+<a name='L562'></a><a href='#L562'>562</a>
+<a name='L563'></a><a href='#L563'>563</a>
+<a name='L564'></a><a href='#L564'>564</a>
+<a name='L565'></a><a href='#L565'>565</a>
+<a name='L566'></a><a href='#L566'>566</a>
+<a name='L567'></a><a href='#L567'>567</a>
+<a name='L568'></a><a href='#L568'>568</a>
+<a name='L569'></a><a href='#L569'>569</a>
+<a name='L570'></a><a href='#L570'>570</a>
+<a name='L571'></a><a href='#L571'>571</a>
+<a name='L572'></a><a href='#L572'>572</a>
+<a name='L573'></a><a href='#L573'>573</a>
+<a name='L574'></a><a href='#L574'>574</a>
+<a name='L575'></a><a href='#L575'>575</a>
+<a name='L576'></a><a href='#L576'>576</a>
+<a name='L577'></a><a href='#L577'>577</a>
+<a name='L578'></a><a href='#L578'>578</a>
+<a name='L579'></a><a href='#L579'>579</a>
+<a name='L580'></a><a href='#L580'>580</a>
+<a name='L581'></a><a href='#L581'>581</a>
+<a name='L582'></a><a href='#L582'>582</a>
+<a name='L583'></a><a href='#L583'>583</a>
+<a name='L584'></a><a href='#L584'>584</a>
+<a name='L585'></a><a href='#L585'>585</a>
+<a name='L586'></a><a href='#L586'>586</a>
+<a name='L587'></a><a href='#L587'>587</a>
+<a name='L588'></a><a href='#L588'>588</a>
+<a name='L589'></a><a href='#L589'>589</a>
+<a name='L590'></a><a href='#L590'>590</a>
+<a name='L591'></a><a href='#L591'>591</a>
+<a name='L592'></a><a href='#L592'>592</a>
+<a name='L593'></a><a href='#L593'>593</a>
+<a name='L594'></a><a href='#L594'>594</a>
+<a name='L595'></a><a href='#L595'>595</a>
+<a name='L596'></a><a href='#L596'>596</a>
+<a name='L597'></a><a href='#L597'>597</a>
+<a name='L598'></a><a href='#L598'>598</a>
+<a name='L599'></a><a href='#L599'>599</a>
+<a name='L600'></a><a href='#L600'>600</a>
+<a name='L601'></a><a href='#L601'>601</a>
+<a name='L602'></a><a href='#L602'>602</a>
+<a name='L603'></a><a href='#L603'>603</a>
+<a name='L604'></a><a href='#L604'>604</a>
+<a name='L605'></a><a href='#L605'>605</a>
+<a name='L606'></a><a href='#L606'>606</a>
+<a name='L607'></a><a href='#L607'>607</a>
+<a name='L608'></a><a href='#L608'>608</a>
+<a name='L609'></a><a href='#L609'>609</a>
+<a name='L610'></a><a href='#L610'>610</a>
+<a name='L611'></a><a href='#L611'>611</a>
+<a name='L612'></a><a href='#L612'>612</a>
+<a name='L613'></a><a href='#L613'>613</a>
+<a name='L614'></a><a href='#L614'>614</a>
+<a name='L615'></a><a href='#L615'>615</a>
+<a name='L616'></a><a href='#L616'>616</a>
+<a name='L617'></a><a href='#L617'>617</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">714x</span>
+<span class="cline-any cline-yes">714x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">36x</span>
+<span class="cline-any cline-yes">36x</span>
+<span class="cline-any cline-yes">36x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">591x</span>
+<span class="cline-any cline-yes">591x</span>
+<span class="cline-any cline-yes">591x</span>
+<span class="cline-any cline-yes">591x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">119x</span>
+<span class="cline-any cline-yes">119x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">2364x</span>
+<span class="cline-any cline-yes">591x</span>
+<span class="cline-any cline-yes">591x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">275x</span>
+<span class="cline-any cline-yes">275x</span>
+<span class="cline-any cline-yes">275x</span>
+<span class="cline-any cline-yes">275x</span>
+<span class="cline-any cline-yes">275x</span>
+<span class="cline-any cline-yes">275x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">41x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">153x</span>
+<span class="cline-any cline-yes">153x</span>
+<span class="cline-any cline-yes">153x</span>
+<span class="cline-any cline-yes">153x</span>
+<span class="cline-any cline-yes">1530x</span>
+<span class="cline-any cline-yes">1530x</span>
+<span class="cline-any cline-yes">1530x</span>
+<span class="cline-any cline-yes">1530x</span>
+<span class="cline-any cline-yes">1530x</span>
+<span class="cline-any cline-yes">1530x</span>
+<span class="cline-any cline-yes">1530x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">312x</span>
+<span class="cline-any cline-yes">312x</span>
+<span class="cline-any cline-yes">312x</span>
+<span class="cline-any cline-yes">312x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">186x</span>
+<span class="cline-any cline-yes">186x</span>
+<span class="cline-any cline-yes">543x</span>
+<span class="cline-any cline-yes">543x</span>
+<span class="cline-any cline-yes">543x</span>
+<span class="cline-any cline-yes">543x</span>
+<span class="cline-any cline-yes">539x</span>
+<span class="cline-any cline-yes">543x</span>
+<span class="cline-any cline-yes">924x</span>
+<span class="cline-any cline-yes">531x</span>
+<span class="cline-any cline-yes">531x</span>
+<span class="cline-any cline-yes">531x</span>
+<span class="cline-any cline-yes">924x</span>
+<span class="cline-any cline-yes">543x</span>
+<span class="cline-any cline-yes">543x</span>
+<span class="cline-any cline-yes">178x</span>
+<span class="cline-any cline-yes">178x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">186x</span>
+<span class="cline-any cline-yes">186x</span>
+<span class="cline-any cline-yes">186x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">54x</span>
+<span class="cline-any cline-yes">54x</span>
+<span class="cline-any cline-yes">54x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-yes">55x</span>
+<span class="cline-any cline-yes">55x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">11x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">44x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">186x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">42x</span>
+<span class="cline-any cline-yes">42x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">42x</span>
+<span class="cline-any cline-yes">42x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">187x</span>
+<span class="cline-any cline-yes">187x</span>
+<span class="cline-any cline-yes">183x</span>
+<span class="cline-any cline-yes">187x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">187x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">187x</span>
+<span class="cline-any cline-yes">187x</span>
+<span class="cline-any cline-yes">55x</span>
+<span class="cline-any cline-yes">55x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">180x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">120x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">31x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">28x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">184x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">181x</span>
+<span class="cline-any cline-yes">184x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">184x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">184x</span>
+<span class="cline-any cline-yes">184x</span>
+<span class="cline-any cline-yes">57x</span>
+<span class="cline-any cline-yes">57x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">182x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">60x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">620x</span>
+<span class="cline-any cline-yes">620x</span>
+<span class="cline-any cline-yes">6376x</span>
+<span class="cline-any cline-yes">620x</span>
+<span class="cline-any cline-yes">620x</span>
+<span class="cline-any cline-yes">620x</span>
+<span class="cline-any cline-yes">6376x</span>
+<span class="cline-any cline-yes">620x</span>
+<span class="cline-any cline-yes">172x</span>
+<span class="cline-any cline-yes">172x</span>
+<span class="cline-any cline-yes">172x</span>
+<span class="cline-any cline-yes">620x</span>
+<span class="cline-any cline-yes">185x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">19x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">186x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">63x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">62x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">61x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">189x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1518x</span>
+<span class="cline-any cline-yes">1518x</span>
+<span class="cline-any cline-yes">1518x</span>
+<span class="cline-any cline-yes">1518x</span>
+<span class="cline-any cline-yes">1517x</span>
+<span class="cline-any cline-yes">1517x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">266x</span>
+<span class="cline-any cline-yes">1251x</span>
+<span class="cline-any cline-yes">1251x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">188x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">254x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-yes">18x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">190x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">141x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">140x</span>
+<span class="cline-any cline-yes">140x</span>
+<span class="cline-any cline-yes">140x</span>
+<span class="cline-any cline-yes">140x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-yes">191x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { CONTRACTS } from './contracts';
+import type { TradeKind } from './contracts';
+import { classifyTrends, digitShareTrends, SHARE_TREND_DEFAULTS } from './share-trend';
+import type { Direction, EnsembleResult, Recommendation, StrategyResult } from './types';
+&nbsp;
+/**
+ * Pattern strategies for Matches/Differs, Even/Odd and Over/Under.
+ *
+ * These are heuristics that describe recent digit history. They are the user's chosen alternatives to
+ * the conservative statistical ensemble and use looser thresholds, so they signal more often. A signal
+ * is a description of past ticks, not a forecast: on fair random digits none of these has an edge.
+ * Scores are heuristic indices, never win probabilities.
+ */
+&nbsp;
+export interface PatternStrategyInfo {
+    id: string;
+    name: string;
+    /** One-line description shown next to the strategy toggle. */
+    summary: string;
+    /** Honest caveat shown to the user. */
+    caution?: string;
+    /** Experimental strategies are available to select but are not on by default. */
+    experimental?: boolean;
+}
+&nbsp;
+export const PATTERN_STRATEGY_INFO: readonly PatternStrategyInfo[] = [
+    { id: 'hot_cold', name: 'Hot &amp; Cold Frequency', summary: 'Which digit or side has run hot over the last 100 / 10 ticks.', caution: 'For Matches/Differs it always votes: with no hot digit it picks Differs on the last digit.' },
+    { id: 'streak_reversal', name: 'Streak Reversal', summary: 'Bets that a run of the same digit or side ends.', caution: 'Assumes a streak is "due" to end (gambler\'s fallacy).' },
+    { id: 'momentum', name: 'Momentum Continuation', summary: 'Bets that the last 10 ticks keep leaning the same way.' },
+    { id: 'skew', name: 'Distribution Skew', summary: 'Long-window (up to 500 ticks) bias away from a fair split.' },
+    { id: 'transition', name: 'Transition Memory', summary: 'What historically followed the current digit or parity.' },
+    { id: 'recency', name: 'Recency Shift', summary: 'Exponentially weighted share that favours the newest ticks.' },
+    { id: 'balance_reversion', name: 'Balance Reversion', summary: 'Bets a side or digit that ran short will catch up.', caution: 'Assumes a correction is owed (gambler\'s fallacy).' },
+    { id: 'cycle', name: 'Cycle &amp; Alternation', summary: 'Detects a short repeating cycle and projects the next slot.' },
+    {
+        id: 'rising_share',
+        name: 'Rising Share',
+        summary: 'Matches on a digit whose share of recent ticks is rising but is still below 11%. Matches/Differs only.',
+        caution: 'Experimental. On fair digits a rising share does not make a digit more likely: use Validate to test it on your ticks.',
+        experimental: true,
+    },
+    {
+        id: 'hot_fade',
+        name: 'Hot Digit Fade',
+        summary: 'Differs on the digit holding 11% or more of recent ticks. Matches/Differs only.',
+        caution: 'Experimental. Differs wins about 90% of the time on any digit, so a win here does not show the idea works.',
+        experimental: true,
+    },
+];
+&nbsp;
+/** Every strategy that can be selected. */
+export const PATTERN_STRATEGY_IDS: readonly string[] = PATTERN_STRATEGY_INFO.map(s =&gt; s.id);
+&nbsp;
+/** Strategies on by default (experimental ones are opt-in). */
+export const DEFAULT_PATTERN_STRATEGY_IDS: readonly string[] = PATTERN_STRATEGY_INFO.filter(s =&gt; !s.experimental).map(s =&gt; s.id);
+&nbsp;
+// ───────────────────────── helpers ─────────────────────────
+&nbsp;
+type Side = 'over' | 'under';
+type HotCold = 'hot' | 'cold';
+&nbsp;
+const clamp = (x: number, lo: number, hi: number) =&gt; Math.max(lo, Math.min(hi, x));
+&nbsp;
+/** Fair-stream rate of "over t" (digit &gt; t) or "under t" (digit &lt; t). */
+const fairRate = (threshold: number, side: Side) =&gt; (side === 'over' ? 9 - threshold : threshold) / 10;
+&nbsp;
+const zScore = (share: number, n: number, p: number) =&gt;
+    n &gt; 0 &amp;&amp; p &gt; 0 &amp;&amp; p &lt; 1 ? (share - p) / Math.sqrt((p * (1 - p)) / n) <span class="branch-0 cbranch-no" title="branch not covered" >: 0;</span>
+&nbsp;
+/** z-score to confidence-style strength, 52..cap. */
+const confidenceFromZ = (z: number, cap = 93) =&gt; clamp(Math.round(50 + 8 * Math.abs(z)), 52, cap);
+&nbsp;
+interface Sample {
+    n: number;
+    share: (predicate: (digit: number) =&gt; boolean) =&gt; number;
+}
+&nbsp;
+const sampleOf = (digits: readonly number[]): Sample =&gt; ({
+    n: digits.length,
+    share: predicate =&gt; (digits.length ? digits.filter(predicate).length / digits.length <span class="branch-0 cbranch-no" title="branch not covered" >: 0)</span>,
+});
+&nbsp;
+/** Sample where newer ticks weigh more. n is the Kish effective sample size. */
+const weightedSample = (digits: readonly number[], decay: number): Sample =&gt; {
+    const weights = digits.map((_, i) =&gt; Math.pow(decay, digits.length - 1 - i));
+    const sum = weights.reduce((a, b) =&gt; a + b, 0);
+    const sumSq = weights.reduce((a, b) =&gt; a + b * b, 0);
+    return {
+        n: sumSq ? (sum * sum) / sumSq <span class="branch-0 cbranch-no" title="branch not covered" >: 0,</span>
+        share: predicate =&gt; (sum ? digits.reduce((acc, d, i) =&gt; acc + (predicate(d) ? weights[i] : 0), 0) / sum <span class="branch-0 cbranch-no" title="branch not covered" >: 0)</span>,
+    };
+};
+&nbsp;
+interface Threshold {
+    side: Side;
+    threshold: number;
+    pct: number;
+    baseline: number;
+    lift: number;
+    z: number;
+    qualified: boolean;
+}
+&nbsp;
+// Only thresholds whose fair hit rate is 40%-75% are considered "safe" candidates.
+const inBand = (t: number, side: Side) =&gt; {
+    const rate = (side === 'over' ? 9 - t : t) * 10;
+    return rate &gt;= 40 &amp;&amp; rate &lt;= 75;
+};
+const OVER_THRESHOLDS = [0, 1, 2, 3, 4, 5, 6, 7, 8].filter(t =&gt; inBand(t, 'over'));
+const UNDER_THRESHOLDS = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(t =&gt; inBand(t, 'under'));
+&nbsp;
+const qualifies = (m: Threshold, zMin: number, mode: HotCold) =&gt;
+    (mode === 'hot' ? m.z &gt;= zMin : m.z &lt;= -zMin) &amp;&amp; Math.abs(m.lift) &gt;= 5;
+&nbsp;
+const thresholdScore = (m: Threshold) =&gt; Math.abs(m.z * m.lift);
+&nbsp;
+/** Best Over (or Under) threshold; falls back to the most extreme unqualified one. */
+function bestThreshold(sample: Sample, side: Side, zMin = 1.6, mode: HotCold = 'hot'): Threshold {
+    let best: Threshold | null = null;
+    let extreme: Threshold | null = null;
+    for (const t of side === 'over' ? OVER_THRESHOLDS : UNDER_THRESHOLDS) {
+        const p = fairRate(t, side);
+        const share = sample.share(d =&gt; (side === 'over' ? d &gt; t : d &lt; t));
+        const m: Threshold = {
+            side,
+            threshold: t,
+            pct: share * 100,
+            baseline: p * 100,
+            lift: ((share - p) / p) * 100,
+            z: zScore(share, sample.n, p),
+            qualified: false,
+        };
+        if (qualifies(m, zMin, mode) &amp;&amp; (!best || thresholdScore(m) &gt; thresholdScore(best))) {
+            best = { ...m, qualified: true };
+        }
+        if (!extreme || (mode === 'hot' ? m.z &gt; extreme.z : m.z &lt; extreme.z)) extreme = m;
+    }
+    return best ?? (extreme as Threshold);
+}
+&nbsp;
+function bestOverUnder(sample: Sample, zMin = 1.6, mode: HotCold = 'hot'): Threshold {
+    const over = bestThreshold(sample, 'over', zMin, mode);
+    const under = bestThreshold(sample, 'under', zMin, mode);
+    if (over.qualified !== under.qualified) return over.qualified ? over : under;
+    return thresholdScore(over) &gt;= thresholdScore(under) ? over : under;
+}
+&nbsp;
+/** Barrier digit to use when a strategy only knows the side. */
+const defaultBarrier = (digits: readonly number[], side: Side) =&gt; {
+    const found = bestThreshold(sampleOf(digits), side, 0);
+    return found.qualified ? found.threshold : side === 'over' ? 3 : 6;
+};
+&nbsp;
+function hotCold(sample: Sample) {
+    let hot = { digit: 0, z: -Infinity, pct: 0 };
+    let cold = { digit: 0, z: Infinity, pct: 0 };
+    for (let d = 0; d &lt; 10; d++) {
+        const share = sample.share(x =&gt; x === d);
+        const z = zScore(share, sample.n, 0.1);
+        if (z &gt; hot.z) hot = { digit: d, z, pct: share * 100 };
+        if (z &lt; cold.z) cold = { digit: d, z, pct: share * 100 };
+    }
+    return { hot, cold };
+}
+&nbsp;
+const runLength = (digits: readonly number[], predicate: (digit: number) =&gt; boolean) =&gt; {
+    let run = 0;
+    for (let i = digits.length - 1; i &gt;= 0 &amp;&amp; predicate(digits[i]); i--) run++;
+    return run;
+};
+&nbsp;
+function detectCycle(seq: readonly string[], repeats: number, maxPeriod = 4) {
+    for (let period = 2; period &lt;= maxPeriod; period++) {
+        const need = period * repeats;
+        if (seq.length &lt; need) <span class="branch-0 cbranch-no" title="branch not covered" >continue;</span>
+        const tail = seq.slice(-need);
+        if (new Set(tail).size &lt; 2) continue;
+        let ok = true;
+        for (let i = period; i &lt; tail.length; i++) {
+            if (tail[i] !== tail[i - period]) {
+                ok = false;
+                break;
+            }
+        }
+        if (ok) return { period, next: tail[tail.length - period], pattern: tail.join('') };
+    }
+    return null;
+}
+&nbsp;
+// ───────────────────────── raw result plumbing ─────────────────────────
+&nbsp;
+interface Pick {
+    direction: Direction;
+    digit?: number;
+}
+&nbsp;
+type Raw =
+    | { kind: 'signal'; pick: Pick; confidence: number; reason: string }
+    | { kind: 'abstain'; reason: string }
+    | { kind: 'ineligible'; reason: string };
+&nbsp;
+const signal = (direction: Direction, digit: number | undefined, confidence: number, reason: string): Raw =&gt; ({
+    kind: 'signal',
+    pick: { direction, digit },
+    confidence,
+    reason,
+});
+const abstain = (reason: string): Raw =&gt; ({ kind: 'abstain', reason });
+const needs = (reason: string): Raw =&gt; ({ kind: 'ineligible', reason });
+&nbsp;
+const pct = (x: number, digits = 1) =&gt; (100 * x).toFixed(digits);
+const directionOf = (t: Threshold): Direction =&gt; (t.side === 'over' ? 'OVER' : 'UNDER');
+&nbsp;
+type RawStrategy = (digits: readonly number[], kind: TradeKind) =&gt; Raw;
+&nbsp;
+// ───────────────────────── the eight strategies ─────────────────────────
+&nbsp;
+const hotCold_: RawStrategy = (digits, kind) =&gt; {
+    if (digits.length &lt; 30) return needs('Insufficient data (needs 30 ticks).');
+    const long = sampleOf(digits.slice(-100));
+    const recent = digits.slice(-10);
+&nbsp;
+    if (kind === 'even_odd') {
+        const share = long.share(d =&gt; d % 2 === 0);
+        const z = zScore(share, long.n, 0.5);
+        if (z &gt;= 1.6) return signal('EVEN', undefined, confidenceFromZ(z), `Even ran ${pct(share)}% of the last ${long.n} ticks (${z.toFixed(1)}σ above an even split).`);
+        if (z &lt;= -1.6) return signal('ODD', undefined, confidenceFromZ(z), `Odd ran ${pct(1 - share)}% of the last ${long.n} ticks (${Math.abs(z).toFixed(1)}σ above an even split).`);
+        return abstain('Even/odd split sits inside its normal range.');
+    }
+    if (kind === 'over_under') {
+        const t = bestOverUnder(long, 1.6);
+        return t.qualified
+            ? signal(directionOf(t), t.threshold, confidenceFromZ(t.z), `${CONTRACTS[directionOf(t)].label} ${t.threshold} hit ${t.pct.toFixed(1)}% of the last ${long.n} ticks vs ${t.baseline.toFixed(0)}% fair.`)
+            : abstain('No safe threshold runs far enough above its fair rate.');
+    }
+    const counts = new Array(10).fill(0);
+    recent.forEach(d =&gt; counts[d]++);
+    let top = 0;
+    for (let d = 1; d &lt; 10; d++) if (counts[d] &gt; counts[top]) top = d;
+    if (counts[top] &gt;= 4) {
+        return signal('MATCHES', top, Math.min(52 + 8 * counts[top], 90), `Digit ${top} appeared ${counts[top]}/10 recently (hot).`);
+    }
+    const last = digits[digits.length - 1];
+    return signal('DIFFERS', last, 58, `No hot digit in the last 10 ticks; low-information fallback picks Differs on the last digit (${last}).`);
+};
+&nbsp;
+const streakReversal: RawStrategy = (digits, kind) =&gt; {
+    if (digits.length &lt; 10) return needs('Insufficient data (needs 10 ticks).');
+    if (kind === 'even_odd') {
+        const evens = runLength(digits, d =&gt; d % 2 === 0);
+        const odds = runLength(digits, d =&gt; d % 2 !== 0);
+        if (evens &gt;= 4) return signal('ODD', undefined, Math.min(58 + 6 * evens, 92), `Even streak x${evens}; betting the run ends.`);
+        if (odds &gt;= 4) return signal('EVEN', undefined, Math.min(58 + 6 * odds, 92), `Odd streak x${odds}; betting the run ends.`);
+        return abstain('No qualifying streak.');
+    }
+    if (kind === 'over_under') {
+        const high = runLength(digits, d =&gt; d &gt; 4);
+        const low = runLength(digits, d =&gt; d &lt;= 4);
+        if (high &gt;= 3) {
+            const b = defaultBarrier(digits.slice(-60), 'under');
+            return signal('UNDER', b, Math.min(58 + 6 * high, 90), `${high} straight ticks above 4; betting a drop, called at Under ${b}.`);
+        }
+        if (low &gt;= 3) {
+            const b = defaultBarrier(digits.slice(-60), 'over');
+            return signal('OVER', b, Math.min(58 + 6 * low, 90), `${low} straight ticks at 4 or below; betting a rise, called at Over ${b}.`);
+        }
+        return abstain('No qualifying streak.');
+    }
+    const last = digits[digits.length - 1];
+    const run = runLength(digits, d =&gt; d === last);
+    return run &gt;= 3
+        ? signal('DIFFERS', last, Math.min(60 + 8 * run, 92), `Digit ${last} on a x${run} streak; betting it does not repeat.`)
+        : abstain('No qualifying streak.');
+};
+&nbsp;
+const momentum: RawStrategy = (digits, kind) =&gt; {
+    if (digits.length &lt; 10) return needs('Insufficient data (needs 10 ticks).');
+    const last10 = digits.slice(-10);
+    if (kind === 'even_odd') {
+        const evens = last10.filter(d =&gt; d % 2 === 0).length;
+        if (evens &gt;= 7) return signal('EVEN', undefined, 55 + 3 * evens, `Even momentum ${evens}/10 recent ticks.`);
+        if (10 - evens &gt;= 7) return signal('ODD', undefined, 55 + 3 * (10 - evens), `Odd momentum ${10 - evens}/10 recent ticks.`);
+        return abstain('No dominant momentum.');
+    }
+    if (kind === 'over_under') {
+        const high = last10.filter(d =&gt; d &gt; 4).length;
+        const recent30 = digits.slice(-30);
+        if (high &gt;= 7) {
+            const b = defaultBarrier(recent30, 'over');
+            return signal('OVER', b, 55 + 3 * high, `Over momentum ${high}/10 recent ticks; Over ${b} is the level the last 30 favour.`);
+        }
+        if (10 - high &gt;= 7) {
+            const b = defaultBarrier(recent30, 'under');
+            return signal('UNDER', b, 55 + 3 * (10 - high), `Under momentum ${10 - high}/10 recent ticks; Under ${b} is the level the last 30 favour.`);
+        }
+        return abstain('No dominant momentum.');
+    }
+    const counts = new Array(10).fill(0);
+    last10.forEach(d =&gt; counts[d]++);
+    let top = 0;
+    for (let d = 1; d &lt; 10; d++) if (counts[d] &gt; counts[top]) top = d;
+    return counts[top] &gt;= 4
+        ? signal('MATCHES', top, Math.min(55 + 8 * counts[top], 90), `Digit ${top} repeating, ${counts[top]}/10 recent ticks.`)
+        : abstain('No dominant momentum.');
+};
+&nbsp;
+const skew: RawStrategy = (digits, kind) =&gt; {
+    const window = digits.slice(-500);
+    if (window.length &lt; 120) return needs('Needs 120+ ticks.');
+    const s = sampleOf(window);
+    if (kind === 'even_odd') {
+        const share = s.share(d =&gt; d % 2 === 0);
+        const z = zScore(share, s.n, 0.5);
+        if (Math.abs(z) &lt; 2) return abstain(`Even/odd sits ${Math.abs(z).toFixed(1)}σ from fair (no skew).`);
+        return signal(z &gt; 0 ? 'EVEN' : 'ODD', undefined, confidenceFromZ(z), `${z &gt; 0 ? 'Even' : 'Odd'} holds ${pct(z &gt; 0 ? share : 1 - share)}% across ${s.n} ticks (${Math.abs(z).toFixed(1)}σ skew).`);
+    }
+    if (kind === 'over_under') {
+        const t = bestOverUnder(s, 2);
+        return t.qualified
+            ? signal(directionOf(t), t.threshold, confidenceFromZ(t.z), `${CONTRACTS[directionOf(t)].label} ${t.threshold} holds ${t.pct.toFixed(1)}% across ${s.n} ticks vs ${t.baseline.toFixed(0)}% fair (${t.z.toFixed(1)}σ).`)
+            : abstain('Long-window spread sits close to fair.');
+    }
+    const { hot, cold } = hotCold(s);
+    if (hot.z &gt;= 2.8) return signal('MATCHES', hot.digit, confidenceFromZ(hot.z), `Digit ${hot.digit} holds ${hot.pct.toFixed(1)}% of ${s.n} ticks vs 10% fair (${hot.z.toFixed(1)}σ over-represented).`);
+    if (cold.z &lt;= -2.8) <span class="branch-0 cbranch-no" title="branch not covered" >return signal('DIFFERS', cold.digit, confidenceFromZ(cold.z), `Digit ${cold.digit} shows in only ${cold.pct.toFixed(1)}% of ${s.n} ticks (${Math.abs(cold.z).toFixed(1)}σ under-represented).`);</span>
+    return abstain('Digit spread is close to uniform.');
+};
+&nbsp;
+const transition: RawStrategy = (digits, kind) =&gt; {
+    if (digits.length &lt; 200) return needs('Needs 200+ ticks.');
+    const last = digits[digits.length - 1];
+    if (kind === 'even_odd') {
+        const parity = last % 2;
+        const next: number[] = [];
+        for (let i = 0; i &lt; digits.length - 1; i++) if (digits[i] % 2 === parity) next.push(digits[i + 1]);
+        if (next.length &lt; 60) <span class="branch-0 cbranch-no" title="branch not covered" >return needs('Not enough matching transitions.');</span>
+        const s = sampleOf(next);
+        const share = s.share(d =&gt; d % 2 === 0);
+        const z = zScore(share, s.n, 0.5);
+        if (Math.abs(z) &lt; 1.8) return abstain(`Nothing follows ${parity ? 'an odd' : 'an even'} tick reliably.`);
+        return signal(z &gt; 0 ? 'EVEN' : 'ODD', undefined, confidenceFromZ(z), `After ${parity ? 'an odd' : 'an even'} tick, ${z &gt; 0 ? 'even' : 'odd'} followed ${pct(z &gt; 0 ? share : 1 - share)}% of ${s.n} times.`);
+    }
+    const next: number[] = [];
+    for (let i = 0; i &lt; digits.length - 1; i++) if (digits[i] === last) next.push(digits[i + 1]);
+    if (next.length &lt; 40) return needs(`Only ${next.length} ticks have ever followed a ${last}.`);
+    const s = sampleOf(next);
+    if (kind === 'over_under') {
+        const t = bestOverUnder(s, 1.8);
+        return t.qualified
+            ? signal(directionOf(t), t.threshold, confidenceFromZ(t.z), `After a ${last}, ${CONTRACTS[directionOf(t)].label} ${t.threshold} landed ${t.pct.toFixed(1)}% of ${s.n} times vs ${t.baseline.toFixed(0)}% fair.`)
+            : abstain(`Nothing consistent follows a ${last}.`);
+    }
+    const { hot, cold } = hotCold(s);
+    if (hot.z &gt;= 2.8) return signal('MATCHES', hot.digit, confidenceFromZ(hot.z), `${hot.digit} follows a ${last} ${hot.pct.toFixed(1)}% of ${s.n} times vs 10% fair.`);
+    if (cold.z &lt;= -2.8) <span class="branch-0 cbranch-no" title="branch not covered" >return signal('DIFFERS', cold.digit, confidenceFromZ(cold.z), `${cold.digit} rarely follows a ${last} (${cold.pct.toFixed(1)}% of ${s.n} times).`);</span>
+    return abstain(`Nothing consistent follows a ${last}.`);
+};
+&nbsp;
+const RECENCY_DECAY = 0.9726549474122855; // half-life about 25 ticks
+&nbsp;
+const recency: RawStrategy = (digits, kind) =&gt; {
+    if (digits.length &lt; 60) return needs('Needs 60+ ticks.');
+    const s = weightedSample(digits.slice(-200), RECENCY_DECAY);
+    const effective = Math.round(s.n);
+    if (kind === 'even_odd') {
+        const share = s.share(d =&gt; d % 2 === 0);
+        const z = zScore(share, s.n, 0.5);
+        if (Math.abs(z) &lt; 1.8) return abstain('Recent ticks show no parity drift.');
+        return signal(z &gt; 0 ? 'EVEN' : 'ODD', undefined, confidenceFromZ(z), `Weighted toward the newest ticks, ${z &gt; 0 ? 'even' : 'odd'} holds ${pct(z &gt; 0 ? share : 1 - share)}% (about ${effective} ticks of weight).`);
+    }
+    if (kind === 'over_under') {
+        const t = bestOverUnder(s, 1.8);
+        return t.qualified
+            ? signal(directionOf(t), t.threshold, confidenceFromZ(t.z), `Weighted toward the newest ticks, ${CONTRACTS[directionOf(t)].label} ${t.threshold} holds ${t.pct.toFixed(1)}% vs ${t.baseline.toFixed(0)}% fair (about ${effective} ticks of weight).`)
+            : abstain('Recent ticks show no threshold drift.');
+    }
+    const { hot, cold } = hotCold(s);
+    if (hot.z &gt;= 2.8) return signal('MATCHES', hot.digit, confidenceFromZ(hot.z), `Digit ${hot.digit} is running hot in the newest ticks (${hot.pct.toFixed(1)}% weighted share).`);
+    if (cold.z &lt;= -2.8) <span class="branch-0 cbranch-no" title="branch not covered" >return signal('DIFFERS', cold.digit, confidenceFromZ(cold.z), `Digit ${cold.digit} has gone quiet in the newest ticks (${cold.pct.toFixed(1)}% weighted share).`);</span>
+    return abstain('Recent ticks track the long-run spread.');
+};
+&nbsp;
+const balanceReversion: RawStrategy = (digits, kind) =&gt; {
+    const window = digits.slice(-200);
+    if (window.length &lt; 80) return needs('Needs 80+ ticks.');
+    const s = sampleOf(window);
+    if (kind === 'even_odd') {
+        const share = s.share(d =&gt; d % 2 === 0);
+        const z = zScore(share, s.n, 0.5);
+        if (z &lt;= -1.8) return signal('EVEN', undefined, confidenceFromZ(z, 88), `Even has only ${pct(share)}% of the last ${s.n} ticks (running ${Math.abs(z).toFixed(1)}σ short).`);
+        if (z &gt;= 1.8) return signal('ODD', undefined, confidenceFromZ(z, 88), `Odd has only ${pct(1 - share)}% of the last ${s.n} ticks (running ${z.toFixed(1)}σ short).`);
+        return abstain('Even/odd is close to balanced.');
+    }
+    if (kind === 'over_under') {
+        const t = bestOverUnder(s, 1.8, 'cold');
+        return t.qualified
+            ? signal(directionOf(t), t.threshold, confidenceFromZ(t.z, 88), `${CONTRACTS[directionOf(t)].label} ${t.threshold} landed only ${t.pct.toFixed(1)}% of ${s.n} ticks vs ${t.baseline.toFixed(0)}% fair; betting a correction.`)
+            : abstain('No threshold is running short of its fair rate.');
+    }
+    let overdue = -1;
+    let longest = -1;
+    for (let d = 0; d &lt; 10; d++) {
+        let gap = digits.length;
+        for (let i = digits.length - 1; i &gt;= 0; i--) {
+            if (digits[i] === d) {
+                gap = digits.length - 1 - i;
+                break;
+            }
+        }
+        if (gap &gt; longest) {
+            longest = gap;
+            overdue = d;
+        }
+    }
+    if (longest &lt; 35) return abstain(`Longest gap is only ${longest} ticks; nothing overdue.`);
+    return signal('MATCHES', overdue, clamp(Math.round(55 + (longest - 35) * 1.2), 55, 88), `Digit ${overdue} unseen for ${longest} ticks (${(100 * Math.pow(0.9, longest)).toFixed(1)}% chance of a gap this long in a fair stream). A long gap does not make the digit due.`);
+};
+&nbsp;
+const cycle: RawStrategy = (digits, kind) =&gt; {
+    if (digits.length &lt; 12) return needs('Insufficient data (needs 12 ticks).');
+    const recent = digits.slice(-24);
+    if (kind === 'even_odd') {
+        const found = detectCycle(recent.map(d =&gt; (d % 2 === 0 ? 'E' : 'O')), 3);
+        return found
+            ? signal(found.next === 'E' ? 'EVEN' : 'ODD', undefined, clamp(60 + 4 * found.period, 60, 86), `Parity locked on a ${found.period}-tick cycle (${found.pattern}); next slot is ${found.next === 'E' ? 'even' : 'odd'}.`)
+            : abstain('Parity shows no repeating cycle.');
+    }
+    if (kind === 'over_under') {
+        const found = detectCycle(recent.map(d =&gt; (d &gt; 4 ? 'H' : 'L')), 3);
+        if (!found) return abstain('Halves show no repeating cycle.');
+        const over = found.next === 'H';
+        const b = defaultBarrier(digits.slice(-60), over ? 'over' : 'under');
+        return signal(over ? 'OVER' : 'UNDER', b, clamp(60 + 4 * found.period, 60, 86), `Halves locked on a ${found.period}-tick cycle (${found.pattern}); next slot is the ${over ? '5-9' : '0-4'} half.`);
+    }
+    const found = detectCycle(recent.map(String), 2);
+    return found
+<span class="branch-0 cbranch-no" title="branch not covered" >        ? signal('MATCHES', Number(found.next), clamp(58 + 3 * found.period, 58, 82), `Digits repeating on a ${found.period}-tick cycle (${found.pattern}); next slot is ${found.next}.`)</span>
+        : abstain('Digits show no repeating cycle.');
+};
+&nbsp;
+const risingShare: RawStrategy = (digits, kind) =&gt; {
+    if (kind !== 'matches_differs') return needs('Digit-level strategy: used for Matches/Differs only.');
+    const trends = digitShareTrends(digits);
+    if (!trends) return needs(`Needs ${SHARE_TREND_DEFAULTS.window + SHARE_TREND_DEFAULTS.shift}+ ticks.`);
+    const { rising } = classifyTrends(trends);
+    if (rising.length === 0) {
+        const best = [...trends].sort((a, b) =&gt; b.growth - a.growth || a.digit - b.digit)[0];
+        return abstain(`No digit gained 1.0+ points while staying under 11%. Largest gain: digit ${best.digit} ${(best.growth * 100).toFixed(1)} points. Not a signal.`);
+    }
+    const top = rising[0];
+    return signal(
+        'MATCHES',
+        top.digit,
+        clamp(Math.round(52 + 800 * top.growth), 52, 75),
+        `Digit ${top.digit} share rose from ${(top.prev * 100).toFixed(1)}% to ${(top.now * 100).toFixed(1)}% over the last ${SHARE_TREND_DEFAULTS.shift} ticks and is still under 11%. This describes past ticks only.`
+    );
+};
+&nbsp;
+const hotFade: RawStrategy = (digits, kind) =&gt; {
+    if (kind !== 'matches_differs') return needs('Digit-level strategy: used for Matches/Differs only.');
+    const trends = digitShareTrends(digits);
+    if (!trends) return needs(`Needs ${SHARE_TREND_DEFAULTS.window + SHARE_TREND_DEFAULTS.shift}+ ticks.`);
+    const { high } = classifyTrends(trends);
+    if (high.length === 0) return abstain('No digit holds 11% or more of the recent ticks.');
+    const top = high[0];
+    return signal(
+        'DIFFERS',
+        top.digit,
+        clamp(Math.round(52 + 500 * (top.now - 0.11)), 52, 70),
+        `Digit ${top.digit} holds ${(top.now * 100).toFixed(1)}% of the last ${SHARE_TREND_DEFAULTS.window} ticks (fair share is 10%); betting against it. Differs wins about 90% of the time on any digit.`
+    );
+};
+&nbsp;
+const RAW_STRATEGIES: Record&lt;string, RawStrategy&gt; = {
+    hot_cold: hotCold_,
+    streak_reversal: streakReversal,
+    momentum,
+    skew,
+    transition,
+    recency,
+    balance_reversion: balanceReversion,
+    cycle,
+    rising_share: risingShare,
+    hot_fade: hotFade,
+};
+&nbsp;
+// ───────────────────────── public API ─────────────────────────
+&nbsp;
+export function runPatternStrategy(id: string, digits: readonly number[], kind: TradeKind): StrategyResult {
+    const info = PATTERN_STRATEGY_INFO.find(s =&gt; s.id === id);
+    const run = RAW_STRATEGIES[id];
+    if (!info || !run) throw new RangeError(`Unknown pattern strategy: ${id}`);
+    const raw = run(digits, kind);
+    if (raw.kind === 'signal') {
+        return {
+            id,
+            name: info.name,
+            status: 'signal',
+            signal: raw.pick.direction,
+            direction: raw.pick.direction,
+            digit: raw.pick.digit,
+            strength: clamp(raw.confidence, 0, 100) / 100,
+            reason: raw.reason,
+        };
+    }
+    return { id, name: info.name, status: raw.kind, signal: 'ABSTAIN', reason: raw.reason };
+}
+&nbsp;
+export interface AnalyzePatternOptions {
+    /** Strategy ids to run. Default: the eight standard strategies. An empty list is rejected. */
+    strategyIds?: readonly string[];
+    /** Minimum strategies that must agree on the same pick (default 1). */
+    minAgree?: number;
+}
+&nbsp;
+const kindDirections = (kind: TradeKind): Direction[] =&gt;
+    (Object.keys(CONTRACTS) as Direction[]).filter(d =&gt; CONTRACTS[d].kind === kind);
+&nbsp;
+const argOf = (result: StrategyResult) =&gt; (result.digit === undefined ? '' : String(result.digit));
+&nbsp;
+/**
+ * Runs the selected strategies and combines their votes into one pick.
+ *
+ * Rule (deterministic): votes are grouped by direction; the direction with the highest
+ * 100*agreeing + 30*votes + total strength wins; within it, the digit with the most votes (then highest
+ * total strength, then lowest digit) is chosen. The heuristic score is the average strength of the
+ * agreeing strategies, scaled by their share of total strength. It is an index, not a probability.
+ */
+export function analyzePattern(
+    digits: readonly number[],
+    kind: TradeKind,
+    options?: AnalyzePatternOptions
+): EnsembleResult {
+    const ids = options?.strategyIds ?? DEFAULT_PATTERN_STRATEGY_IDS;
+    const minAgree = Math.max(1, Math.floor(options?.minAgree ?? 1));
+&nbsp;
+    if (ids.length === 0) {
+        return { strategies: [], recommendation: null, reason: 'No strategies selected.' };
+    }
+    if (digits.length === 0 || digits.some(d =&gt; !Number.isInteger(d) || d &lt; 0 || d &gt; 9)) {
+        return {
+            strategies: [],
+            recommendation: null,
+            reason: 'Invalid digit sequence: expected a non-empty array of integers from 0 to 9.',
+        };
+    }
+&nbsp;
+    const strategies = ids.map(id =&gt; runPatternStrategy(id, digits, kind));
+    const eligible = strategies.filter(s =&gt; s.status !== 'ineligible').length;
+    if (eligible === 0) <span class="branch-0 cbranch-no" title="branch not covered" >return { strategies, recommendation: null, reason: 'No eligible strategies.' };</span>
+&nbsp;
+    const allowed = new Set(kindDirections(kind));
+    const votes = strategies.filter(s =&gt; s.status === 'signal' &amp;&amp; s.direction &amp;&amp; allowed.has(s.direction));
+    if (votes.length === 0) return { strategies, recommendation: null, reason: 'No strategy produced a valid signal.' };
+&nbsp;
+    const strength = (s: StrategyResult) =&gt; (s.strength<span class="branch-0 cbranch-no" title="branch not covered" > ?? 0)</span> * 100;
+&nbsp;
+    const groups = new Map&lt;Direction, StrategyResult[]&gt;();
+    for (const v of votes) {
+        const list = groups.get(v.direction as Direction) ?? [];
+        list.push(v);
+        groups.set(v.direction as Direction, list);
+    }
+&nbsp;
+    const bestDigitFor = (list: StrategyResult[]) =&gt; {
+        const byArg = new Map&lt;string, { count: number; total: number }&gt;();
+        for (const v of list) {
+            const entry = byArg.get(argOf(v)) ?? { count: 0, total: 0 };
+            entry.count += 1;
+            entry.total += strength(v);
+            byArg.set(argOf(v), entry);
+        }
+        return [...byArg.entries()].sort(
+            (a, b) =&gt;
+                b[1].count - a[1].count ||
+                b[1].total - a[1].total<span class="branch-0 cbranch-no" title="branch not covered" > ||</span>
+<span class="cstat-no" title="statement not covered" >                (a[0] === '' ? -1 : b[0] === '' ? 1 : Number(a[0]) - Number(b[0]))</span>
+        )[0][0];
+    };
+&nbsp;
+    const ranked = [...groups.entries()]
+        .map(([direction, list]) =&gt; {
+            const arg = bestDigitFor(list);
+            const agreeing = list.filter(v =&gt; argOf(v) === arg);
+            const total = list.reduce((a, v) =&gt; a + strength(v), 0);
+            return { direction, arg, agreeing, rank: 100 * agreeing.length + 30 * list.length + total };
+        })
+        .sort((a, b) =&gt; b.rank - a.rank || a.direction.localeCompare(b.direction));
+&nbsp;
+    const winner = ranked[0];
+    if (winner.agreeing.length &lt; minAgree) {
+        return {
+            strategies,
+            recommendation: null,
+            reason: `Consensus not reached: ${winner.agreeing.length} agreeing strategy(ies); ${minAgree} required.`,
+        };
+    }
+&nbsp;
+    const agreeingStrength = winner.agreeing.reduce((a, v) =&gt; a + strength(v), 0);
+    const allStrength = votes.reduce((a, v) =&gt; a + strength(v), 0);
+    const score = clamp(
+        Math.round((agreeingStrength / winner.agreeing.length) * (0.72 + 0.38 * (allStrength &gt; 0 ? agreeingStrength / allStrength <span class="branch-0 cbranch-no" title="branch not covered" >: 1)</span>)),
+        1,
+        96
+    );
+&nbsp;
+    const recommendation: Recommendation = {
+        direction: winner.direction,
+        digit: winner.arg === '' ? null : Number(winner.arg),
+        agree: winner.agreeing.length,
+        disagree: votes.length - winner.agreeing.length,
+        eligible,
+        heuristicScore: score,
+    };
+    return { strategies, recommendation };
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-11-08T00:52:05.718Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

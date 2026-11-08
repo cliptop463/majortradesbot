@@ -643,7 +643,9 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                     </div>
                     <p className='bulk-strategy-modal__hint'>
                         {base.mode === 'paper'
-                            ? localize('Paper sends no orders. It asks Deriv for a real quote and settles from the real tick stream. A tie for highest tick counts as a loss.')
+                            ? base.strategyId === 'last-ticks-matches'
+                                ? localize('Paper sends no orders. It obtains a separate Deriv quote for every barrier and settles each contract on its next real tick.')
+                                : localize('Paper sends no orders. It asks Deriv for a real quote and settles from the real tick stream. A tie for highest tick counts as a loss.')
                             : localize('Live sends real buy orders on the account the app is logged in to.')}
                     </p>
 
@@ -671,7 +673,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                         <div className='bulk-strategy-modal__limit-help' data-testid='dt_bulk_limit_help'>
                             <p className='bulk-strategy-modal__message bulk-strategy-modal__message--error'>
                                 {localize(
-                                    'Run is blocked because Max loss is below the worst-case cost. Raise Max loss to at least {{amount}}, or reduce your stake, bulk size, or martingale settings.',
+                                    'Run is blocked because Max loss is below the worst-case cost. Raise Max loss to at least {{amount}}, or reduce your stake, batch size, or martingale settings.',
                                     { amount: money(worst_case) }
                                 )}
                             </p>
@@ -852,8 +854,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                                 {log.contracts}
                                             </td>
                                             <td>{money(log.stake)}</td>
-                                            <td>{`${log.won}/${log.lost}${log.interrupted ? ` (+${log.interrupted}?)` : ''}`}</td>
-                                                <td>{`${log.won}/${log.lost}${log.failed ? ` (${log.failed} failed)` : ''}${log.interrupted ? ` (+${log.interrupted}?)` : ''}`}</td>
+                                            <td>{`${log.won}/${log.lost}${log.failed ? ` (${log.failed} failed)` : ''}${log.interrupted ? ` (+${log.interrupted}?)` : ''}`}</td>
                                             <td className={log.net < 0 ? 'bulk-strategy-modal__neg' : 'bulk-strategy-modal__pos'}>{money(log.net)}</td>
                                             <td>{money(log.cumulative)}</td>
                                         </tr>
