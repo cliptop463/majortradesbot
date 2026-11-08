@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40.76% </span>
+                <span class="strong">32.3% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>53/130</span>
+                <span class='fraction'>42/130</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/3</span>
+                <span class='fraction'>0/0</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">16.66% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>3/18</span>
+                <span class='fraction'>0/18</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">40.76% </span>
+                <span class="strong">32.3% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>53/130</span>
+                <span class='fraction'>42/130</span>
             </div>
         
             
@@ -206,33 +206,10 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
-<span class="cline-any cline-yes">11x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -255,6 +232,29 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -273,9 +273,9 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -336,10 +336,10 @@ const TOKEN_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
 &nbsp;
 // --- CSRF Token ---
 &nbsp;
-export function storeCSRFToken(token: string): void {
-  const stored: StoredCSRFToken = { value: token, createdAt: Date.now() };
-  sessionStorage.setItem(CSRF_TOKEN_KEY, JSON.stringify(stored));
-}
+<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export function storeCSRFToken(token: string): void {</span></span>
+<span class="cstat-no" title="statement not covered" >  const stored: StoredCSRFToken = { value: token, createdAt: Date.now() };</span>
+<span class="cstat-no" title="statement not covered" >  sessionStorage.setItem(CSRF_TOKEN_KEY, JSON.stringify(stored));</span>
+<span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export function getCSRFToken(): string | null {</span></span>
 <span class="cstat-no" title="statement not covered" >  const raw = sessionStorage.getItem(CSRF_TOKEN_KEY);</span>
@@ -359,10 +359,10 @@ export function storeCSRFToken(token: string): void {
 &nbsp;
 // --- PKCE Code Verifier ---
 &nbsp;
-export function storeCodeVerifier(verifier: string): void {
-  const stored: StoredCodeVerifier = { value: verifier, createdAt: Date.now() };
-  sessionStorage.setItem(CODE_VERIFIER_KEY, JSON.stringify(stored));
-}
+<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export function storeCodeVerifier(verifier: string): void {</span></span>
+<span class="cstat-no" title="statement not covered" >  const stored: StoredCodeVerifier = { value: verifier, createdAt: Date.now() };</span>
+<span class="cstat-no" title="statement not covered" >  sessionStorage.setItem(CODE_VERIFIER_KEY, JSON.stringify(stored));</span>
+<span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export function getCodeVerifier(): string | null {</span></span>
 <span class="cstat-no" title="statement not covered" >  const raw = sessionStorage.getItem(CODE_VERIFIER_KEY);</span>
@@ -403,9 +403,9 @@ export function storeCodeVerifier(verifier: string): void {
 <span class="cstat-no" title="statement not covered" >  return authInfo;</span>
 <span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
-export function clearAuthInfo(): void {
-  localStorage.removeItem(AUTH_INFO_KEY);
-}
+<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >export function clearAuthInfo(): void {</span></span>
+<span class="cstat-no" title="statement not covered" >  localStorage.removeItem(AUTH_INFO_KEY);</span>
+<span class="cstat-no" title="statement not covered" >}</span>
 &nbsp;
 // --- Deriv Accounts ---
 &nbsp;
@@ -460,7 +460,7 @@ export function clearAuthInfo(): void {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-08T00:52:05.718Z
+                at 2026-11-08T03:36:54.574Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

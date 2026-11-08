@@ -22,7 +22,7 @@ describe('digit scanner scan utilities', () => {
     });
 
     it('fetchHistory sends the correct tick_history request and returns prices plus pip_size', async () => {
-        const send = jest.fn().mockResolvedValue({
+        const send = jest.fn<() => Promise<{ history: { prices: number[] }; pip_size: number }>>().mockResolvedValue({
             history: { prices: [1.23, 1.24, 1.25] },
             pip_size: 0.01,
         });
@@ -67,7 +67,7 @@ describe('digit scanner scan utilities', () => {
         ];
 
         const fetchHistoryMock = jest
-            .fn()
+            .fn<() => Promise<{ prices: number[] }>>()
             .mockRejectedValueOnce(new Error('network timeout'))
             .mockResolvedValueOnce({
                 prices: Array.from({ length: 250 }, (_, i) => 1.23 + (i % 10) / 100),

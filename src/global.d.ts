@@ -94,6 +94,9 @@ declare global {
         Analytics: unknown;
         DD_RUM: object | undefined;
         GrowthbookFeatures: { [key: string]: boolean };
+        run_panel?: {
+            is_running?: boolean;
+        };
         LC_API: {
             on_chat_ended: VoidFunction;
             open_chat_window: VoidFunction;
