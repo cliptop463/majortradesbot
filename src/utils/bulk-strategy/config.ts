@@ -96,7 +96,10 @@ export function validateConfig(config: BulkConfig): string[] {
     const problems: string[] = [];
     if (!getStrategy(config.strategyId)) problems.push('Choose a strategy.');
     if (!(MARKETS as readonly string[]).includes(config.symbol)) problems.push('Choose a volatility index.');
-    if (!Number.isInteger(config.bulkSize) || config.bulkSize < MIN_BULK || config.bulkSize > MAX_BULK) {
+    if (
+        !getStrategy(config.strategyId)?.batchSize &&
+        (!Number.isInteger(config.bulkSize) || config.bulkSize < MIN_BULK || config.bulkSize > MAX_BULK)
+    ) {
         problems.push(`Bulk size must be a whole number from ${MIN_BULK} to ${MAX_BULK}.`);
     }
     if (config.strategyId === 'last-ticks-matches' && !validateMatchesTickCount(config.matchesTickCount)) {

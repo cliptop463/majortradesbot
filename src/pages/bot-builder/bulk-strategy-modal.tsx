@@ -480,12 +480,14 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                         ))}
                     </div>
                     <p className='bulk-strategy-modal__hint'>
-                        {localize('A risk level only fills the bulk size and martingale below. Edit any field afterwards.')}
+                        {base.strategyId === 'last-ticks-matches'
+                            ? localize('A risk level fills the martingale settings. The recent digit count controls the Matches batch size.')
+                            : localize('A risk level only fills the bulk size and martingale below. Edit any field afterwards.')}
                     </p>
 
                     <div className='bulk-strategy-modal__grid'>
                         {[
-                            ['bulkSize', localize('Bulk size (1–10)')],
+                            ...(base.strategyId === 'last-ticks-matches' ? [] : [['bulkSize', localize('Bulk size (1–10)')]]),
                             ['stake', localize('Stake per contract')],
                             ['profitTarget', localize('Profit target')],
                             ['maxLoss', localize('Max loss')],

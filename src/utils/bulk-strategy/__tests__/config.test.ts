@@ -126,6 +126,7 @@ describe('validation', () => {
             );
         }
         expect(validateConfig(cfg({ strategyId: 'last-ticks-matches', matchesTickCount: 10, maxLoss: 30 }))).toEqual([]);
+        expect(validateConfig(cfg({ strategyId: 'last-ticks-matches', bulkSize: 0, matchesTickCount: 5 }))).toEqual([]);
     });
 
     it('rejects non-positive money fields and an unknown market or strategy', () => {

@@ -76,7 +76,7 @@ also regenerate brand CSS — see Branding below.)
 ## Running a bulk strategy
 
 1. Open **Bulk Strategy** from the bot builder toolbar.
-2. Choose a strategy and market, then set the stake, bulk size, profit target, and max loss. Last-Ticks Matches has a separate **Number of Recent Tick Digits** setting (1–10, default 5); it creates one independent one-tick DIGITMATCH contract per selected digit, preserving duplicates.
+2. Choose a strategy and market, then set the stake, profit target, and max loss. Tick Striker also has a bulk-size setting. Last-Ticks Matches instead has **Number of Recent Tick Digits** (1–10, default 5); it creates one independent one-tick DIGITMATCH contract per selected digit, preserving duplicates.
 3. Keep **Paper** selected to test with live market quotes without placing orders, then choose **Start Paper test**. Starting uses and saves the values currently shown; the separate **Save** button is optional.
 4. Use **Start Live trading** only when you are ready to place real or Demo-account orders. Live mode requires an authorized account, and enabling a Real account requires a separate confirmation.
 
