@@ -68,8 +68,8 @@ describe('Last-Ticks Matches strategy', () => {
     });
 
     it('waits for the configured number of quotes before producing a signal', () => {
-        expect(lastTicksMatches.evaluate([10, 10.1], { ...DEFAULT_CONFIG, matchesTickCount: 3 }).trade).toBe(false);
-        expect(lastTicksMatches.evaluate([10, 10.1, 10.2], { ...DEFAULT_CONFIG, matchesTickCount: 3 }).trade).toBe(true);
+        expect(lastTicksMatches.evaluateWithConfig?.([10, 10.1], { ...DEFAULT_CONFIG, matchesTickCount: 3 }).trade).toBe(false);
+        expect(lastTicksMatches.evaluateWithConfig?.([10, 10.1, 10.2], { ...DEFAULT_CONFIG, matchesTickCount: 3 }).trade).toBe(true);
     });
 
     it('settles each contract against the next tick digit and its own barrier', () => {

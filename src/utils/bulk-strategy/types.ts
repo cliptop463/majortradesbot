@@ -105,7 +105,9 @@ export interface BulkStrategy {
     /** Ticks after entry that decide the contract. */
     ticksToSettle: number;
     contract(config: BulkConfig): ContractSpec;
-    evaluate(ticks: readonly number[], config?: BulkConfig): SignalResult;
+    evaluate(ticks: readonly number[]): SignalResult;
+    /** Optional config-aware evaluation without changing legacy strategy parameters. */
+    evaluateWithConfig?(ticks: readonly number[], config: BulkConfig): SignalResult;
     /** Paper settlement from REAL ticks after entry. undefined while there are too few ticks. */
     settle(ticksAfterEntry: readonly number[], spec: ContractSpec): boolean | undefined;
     /** Optional per-contract instructions for strategies whose batch contains different specs. */

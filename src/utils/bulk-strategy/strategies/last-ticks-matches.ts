@@ -52,6 +52,15 @@ const contract = (_config: BulkConfig): ContractSpec => ({
     barrier: '0',
 });
 
+function evaluateMatches(ticks: readonly number[], count: number): SignalResult {
+    const trade = validateMatchesTickCount(count) && ticks.length >= count;
+    return {
+        trade,
+        score: null,
+        reason: trade ? `Collected the newest ${count} tick digits.` : 'Collecting recent tick digits.',
+    };
+}
+
 export const lastTicksMatches: BulkStrategy = {
     id: 'last-ticks-matches',
     label: 'Last-Ticks Matches',
@@ -60,16 +69,8 @@ export const lastTicksMatches: BulkStrategy = {
     bufferSize: MAX_MATCHES_TICK_COUNT,
     ticksToSettle: 1,
     contract,
-    evaluate(ticks, config) {
-        const count = config?.matchesTickCount ?? DEFAULT_MATCHES_TICK_COUNT;
-        const trade = validateMatchesTickCount(count) && ticks.length >= count;
-        const result: SignalResult = {
-            trade,
-            score: null,
-            reason: trade ? `Collected the newest ${count} tick digits.` : 'Collecting recent tick digits.',
-        };
-        return result;
-    },
+    evaluate: ticks => evaluateMatches(ticks, DEFAULT_MATCHES_TICK_COUNT),
+    evaluateWithConfig: (ticks, config) => evaluateMatches(ticks, config.matchesTickCount),
     settle: () => undefined,
     createTradeIntents(ticks, config) {
         return createMatchIntents(ticks, config.matchesTickCount);

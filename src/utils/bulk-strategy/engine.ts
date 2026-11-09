@@ -385,7 +385,10 @@ export class BulkEngine {
             };
             const check = () => {
                 if (this.lastSignaledTickSequence === this.tickSequence) return;
-                const signal = this.strategy.evaluate(this.getEvaluationTicks(), this.config);
+                const evaluationTicks = this.getEvaluationTicks();
+                const signal = this.strategy.evaluateWithConfig
+                    ? this.strategy.evaluateWithConfig(evaluationTicks, this.config)
+                    : this.strategy.evaluate(evaluationTicks);
                 this.lastScore = signal.score;
                 this.lastDiagnostics = signal.diagnostics ?? null;
                 this.signalStats.evaluations++;
