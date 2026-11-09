@@ -607,10 +607,7 @@ export class BulkEngine {
     private async playRound(signal: SignalResult, stake: number) {
         const startedAt = this.now();
         const roundNumber = this.stats.rounds + 1;
-        const intentTicks = this.matchesFreshAfterSequence === null
-            ? this.marketTicks
-            : this.marketTicks.filter(tick => tick.sequence > this.matchesFreshAfterSequence!);
-        const intents = this.strategy.createTradeIntents?.(intentTicks, this.config);
+        const intents = this.strategy.createTradeIntents?.(this.marketTicks, this.config);
         if (intents && intents.length === 0) return;
         const spec = intents ? null : this.strategy.contract(this.config);
         const result = intents

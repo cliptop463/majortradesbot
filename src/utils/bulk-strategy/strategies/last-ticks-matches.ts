@@ -3,6 +3,7 @@ import type { BulkConfig, BulkStrategy, ContractSpec, MarketTick, SignalResult, 
 export const MIN_MATCHES_TICK_COUNT = 1;
 export const MAX_MATCHES_TICK_COUNT = 10;
 export const DEFAULT_MATCHES_TICK_COUNT = 5;
+export const MATCHES_LOOKBACK_TICK_COUNT = 100;
 
 export function extractFinalDigit(tick: Pick<MarketTick, 'quote' | 'pipSize'>): number | null {
     const { quote, pipSize } = tick;
@@ -32,17 +33,25 @@ export function createMatchIntents(ticks: readonly MarketTick[], count: number):
         throw new RangeError(`Number of recent tick digits must be a whole number from ${MIN_MATCHES_TICK_COUNT} to ${MAX_MATCHES_TICK_COUNT}.`);
     }
 
-    const recent = ticks.slice(-count);
+    const recent = ticks.slice(-MATCHES_LOOKBACK_TICK_COUNT);
     if (recent.length < count) return [];
 
-    return recent.map(tick => {
+    const counts = Array<number>(10).fill(0);
+    const lastSeen = Array<number>(10).fill(-1);
+    recent.forEach((tick, index) => {
         const digit = extractFinalDigit(tick);
         if (digit === null) throw new Error('Tick precision metadata is unavailable for Last-Ticks Matches.');
-        return {
+        counts[digit]++;
+        lastSeen[digit] = index;
+    });
+
+    return Array.from({ length: 10 }, (_, digit) => digit)
+        .sort((a, b) => counts[a] - counts[b] || lastSeen[a] - lastSeen[b] || a - b)
+        .slice(0, count)
+        .map(digit => ({
             spec: { contract_type: 'DIGITMATCH', duration: 1, duration_unit: 't', barrier: String(digit) },
             sourceDigit: digit,
-        };
-    });
+        }));
 }
 
 const contract = (_config: BulkConfig): ContractSpec => ({
@@ -57,16 +66,17 @@ function evaluateMatches(ticks: readonly number[], count: number): SignalResult 
     return {
         trade,
         score: null,
-        reason: trade ? `Collected the newest ${count} tick digits.` : 'Collecting recent tick digits.',
+        reason: trade ? `Collected ${count} fresh ticks for a batch of unique match barriers.` : 'Collecting fresh ticks for the next match batch.',
     };
 }
 
 export const lastTicksMatches: BulkStrategy = {
     id: 'last-ticks-matches',
     label: 'Last-Ticks Matches',
-    description: 'Match each of the newest selected tick digits with its own one-tick DIGITMATCH contract. Repeated digits remain separate contracts.',
+    description:
+        'Each batch uses unique DIGITMATCH barriers, ranked by lowest frequency and then longest time since seen in the last 100 ticks. This is only a historical heuristic; it cannot predict or guarantee a win or recover losses.',
     minTicks: MIN_MATCHES_TICK_COUNT,
-    bufferSize: MAX_MATCHES_TICK_COUNT,
+    bufferSize: MATCHES_LOOKBACK_TICK_COUNT,
     ticksToSettle: 1,
     contract,
     evaluate: ticks => evaluateMatches(ticks, DEFAULT_MATCHES_TICK_COUNT),

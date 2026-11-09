@@ -125,7 +125,7 @@ describe('defaults and saved settings', () => {
         ]);
     });
 
-    it('shows and saves a separate Matches digit count only for that strategy', () => {
+    it('shows and saves the Matches batch size only for that strategy', () => {
         renderOpen(<BulkStrategyModal {...props()} />);
         expect(screen.queryByTestId('dt_bulk_matchesTickCount')).toBeNull();
         fireEvent.change(screen.getByTestId('dt_bulk_strategy'), { target: { value: 'last-ticks-matches' } });

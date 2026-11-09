@@ -35,26 +35,28 @@ describe('Last-Ticks Matches strategy', () => {
         expect(intents).toHaveLength(count);
     });
 
-    it('selects only the newest N tick digits', () => {
-        const intents = createMatchIntents(ticksForDigits([1, 2, 3, 4, 5, 6]), 3);
-        expect(intents.map(intent => intent.spec.barrier)).toEqual(['4', '5', '6']);
+    it('selects the least frequent digits, breaking ties by oldest last occurrence', () => {
+        const intents = createMatchIntents(ticksForDigits([0, 0, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9]), 3);
+        expect(intents.map(intent => intent.spec.barrier)).toEqual(['1', '3', '4']);
     });
 
-    it('preserves duplicate digits as separate contracts', () => {
+    it('creates unique barriers even when the history contains repeated digits', () => {
         const intents = createMatchIntents(ticksForDigits([2, 7, 2, 4, 2]), 5);
-        expect(intents.map(intent => intent.spec.barrier)).toEqual(['2', '7', '2', '4', '2']);
-        expect(new Set(intents).size).toBe(5);
+        expect(intents.map(intent => intent.spec.barrier)).toEqual(['0', '1', '3', '5', '6']);
+        expect(new Set(intents.map(intent => intent.spec.barrier)).size).toBe(5);
     });
 
     it('represents zero and nine barriers without changing them', () => {
-        expect(createMatchIntents(ticksForDigits([0, 9]), 2).map(intent => intent.spec.barrier)).toEqual(['0', '9']);
+        expect(createMatchIntents(ticksForDigits([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]), 10).map(intent => intent.spec.barrier)).toEqual(
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+        );
     });
 
     it('configures every intent as an independent one-tick DIGITMATCH contract', () => {
         expect(createMatchIntents(ticksForDigits([2, 7, 2]), 3)).toEqual([
-            { spec: { contract_type: 'DIGITMATCH', duration: 1, duration_unit: 't', barrier: '2' }, sourceDigit: 2 },
-            { spec: { contract_type: 'DIGITMATCH', duration: 1, duration_unit: 't', barrier: '7' }, sourceDigit: 7 },
-            { spec: { contract_type: 'DIGITMATCH', duration: 1, duration_unit: 't', barrier: '2' }, sourceDigit: 2 },
+            { spec: { contract_type: 'DIGITMATCH', duration: 1, duration_unit: 't', barrier: '0' }, sourceDigit: 0 },
+            { spec: { contract_type: 'DIGITMATCH', duration: 1, duration_unit: 't', barrier: '1' }, sourceDigit: 1 },
+            { spec: { contract_type: 'DIGITMATCH', duration: 1, duration_unit: 't', barrier: '3' }, sourceDigit: 3 },
         ]);
         expect(lastTicksMatches.contract(DEFAULT_CONFIG)).toMatchObject({ contract_type: 'DIGITMATCH', duration: 1, duration_unit: 't' });
     });
@@ -73,11 +75,11 @@ describe('Last-Ticks Matches strategy', () => {
     });
 
     it('settles each contract against the next tick digit and its own barrier', () => {
-        const [two, seven] = createMatchIntents(ticksForDigits([2, 7]), 2);
-        const nextTick = [marketTick(99.2, 1, 3)];
-        expect(lastTicksMatches.settleIntent?.(nextTick, two)).toBe(true);
-        expect(lastTicksMatches.settleIntent?.(nextTick, seven)).toBe(false);
-        expect(lastTicksMatches.settleIntent?.([], two)).toBeUndefined();
+        const [first, second] = createMatchIntents(ticksForDigits([2, 7]), 2);
+        const nextTick = ticksForDigits([Number(second.spec.barrier)]);
+        expect(lastTicksMatches.settleIntent?.(nextTick, first)).toBe(false);
+        expect(lastTicksMatches.settleIntent?.(nextTick, second)).toBe(true);
+        expect(lastTicksMatches.settleIntent?.([], first)).toBeUndefined();
     });
 
     it('uses precision metadata to preserve trailing zero digits', () => {
@@ -91,6 +93,12 @@ describe('Last-Ticks Matches strategy', () => {
     it('does not create contracts if the history is shorter than N', () => {
         expect(createMatchIntents(ticksForDigits([1, 2]), 3)).toEqual([]);
     });
+
+    it('uses the full retained history to rank barriers, not only the newest batch-sized slice', () => {
+        const history = ticksForDigits([1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 9, 0]);
+        const intents = createMatchIntents(history, 2);
+        expect(intents.map(intent => intent.spec.barrier)).toEqual(['4', '5']);
+    });
 });
 
 describe('Last-Ticks Matches engine batches', () => {
@@ -99,8 +107,9 @@ describe('Last-Ticks Matches engine batches', () => {
         const rounds: any[] = [];
         api.responders.push(request => {
             if (request.ticks_history) return { history: { prices: [10.1, 10.2], pip_size: 1 }, subscription: { id: 'tick-sub' } };
+            const barriers = createMatchIntents(ticksForDigits([1, 2]), 2).map(intent => intent.spec.barrier);
             if (request.proposal) {
-                return { proposal: { payout: request.barrier === '1' ? 2 : 4, ask_price: 1 } };
+                return { proposal: { payout: request.barrier === barriers[0] ? 2 : 4, ask_price: 1 } };
             }
             return undefined;
         });
@@ -109,16 +118,16 @@ describe('Last-Ticks Matches engine batches', () => {
         await flush();
 
         const proposals = api.sent.filter(request => request.proposal);
-        expect(proposals.map(request => request.barrier)).toEqual(['1', '2']);
+        expect(proposals.map(request => request.barrier)).toEqual(createMatchIntents(ticksForDigits([1, 2]), 2).map(intent => intent.spec.barrier));
         expect(proposals.every(request => request.contract_type === 'DIGITMATCH' && request.duration === 1 && request.duration_unit === 't')).toBe(true);
         expect(rounds).toHaveLength(0);
 
-        emitTick(api, 1);
+        emitTick(api, Number(proposals[0].barrier));
         await flush();
         expect(rounds[0]).toMatchObject({ contracts: 2, won: 1, lost: 1, net: 0 });
         expect(rounds[0].tradeResults.map((result: any) => [result.barrier, result.payout, result.status, result.profit])).toEqual([
-            ['1', 2, 'won', 1],
-            ['2', 4, 'lost', -1],
+            [proposals[0].barrier, 2, 'won', 1],
+            [proposals[1].barrier, 4, 'lost', -1],
         ]);
         await engine.stop();
     });
@@ -127,9 +136,10 @@ describe('Last-Ticks Matches engine batches', () => {
         const api = new FakeApi();
         const rounds: any[] = [];
         let resolveFirstProposal: ((response: unknown) => void) | undefined;
+        const barriers = createMatchIntents(ticksForDigits([1, 2]), 2).map(intent => intent.spec.barrier);
         api.responders.push(request => {
             if (request.ticks_history) return { history: { prices: [10.1, 10.2], pip_size: 1 }, subscription: { id: 'tick-sub' } };
-            if (request.proposal && request.barrier === '1') {
+            if (request.proposal && request.barrier === barriers[0]) {
                 return new Promise(resolve => {
                     resolveFirstProposal = resolve;
                 });
@@ -142,16 +152,16 @@ describe('Last-Ticks Matches engine batches', () => {
         await flush();
         expect(resolveFirstProposal).toBeDefined();
 
-        emitTick(api, 2);
+        emitTick(api, Number(barriers[1]));
         resolveFirstProposal?.({ proposal: { payout: 3, ask_price: 1 } });
         await flush();
         expect(rounds).toHaveLength(0);
 
-        emitTick(api, 1);
+        emitTick(api, Number(barriers[0]));
         await flush();
         expect(rounds[0].tradeResults.map((result: any) => [result.barrier, result.status, result.profit])).toEqual([
-            ['1', 'won', 2],
-            ['2', 'won', 3],
+            [barriers[0], 'won', 2],
+            [barriers[1], 'won', 3],
         ]);
         await engine.stop();
     });
@@ -159,9 +169,11 @@ describe('Last-Ticks Matches engine batches', () => {
     it('does not begin another batch while any prior live contract remains open', async () => {
         const api = new FakeApi();
         let nextContractId = 100;
+        const firstBarriers = createMatchIntents(ticksForDigits([1, 2]), 2).map(intent => intent.spec.barrier);
+        const nextBarriers = createMatchIntents(ticksForDigits([1, 2, 3, 4, 3, 4]), 2).map(intent => intent.spec.barrier);
         api.responders.push(request => {
             if (request.ticks_history) return { history: { prices: [10.1, 10.2], pip_size: 1 }, subscription: { id: 'tick-sub' } };
-            if (request.buy) return { buy: { contract_id: ++nextContractId, buy_price: 1, payout: request.parameters.barrier === '3' ? 2 : 3 } };
+            if (request.buy) return { buy: { contract_id: ++nextContractId, buy_price: 1, payout: request.parameters.barrier === firstBarriers[0] ? 2 : 3 } };
             if (request.proposal_open_contract) {
                 return { subscription: { id: `poc-${request.contract_id}` }, proposal_open_contract: { contract_id: request.contract_id, is_sold: 0 } };
             }
@@ -188,7 +200,7 @@ describe('Last-Ticks Matches engine batches', () => {
         await flush();
         const buys = api.sent.filter(request => request.buy);
         expect(buys).toHaveLength(4);
-        expect(buys.slice(2).map(request => request.parameters.barrier)).toEqual(['3', '4']);
+        expect(buys.slice(2).map(request => request.parameters.barrier)).toEqual(nextBarriers);
         await engine.stop();
     });
 
@@ -196,10 +208,11 @@ describe('Last-Ticks Matches engine batches', () => {
         const api = new FakeApi();
         const rounds: any[] = [];
         const errors: string[] = [];
+        const barriers = createMatchIntents(ticksForDigits([1, 2]), 2).map(intent => intent.spec.barrier);
         api.responders.push(request => {
             if (request.ticks_history) return { history: { prices: [10.1, 10.2], pip_size: 1 }, subscription: { id: 'tick-sub' } };
             if (request.buy) {
-                return request.parameters.barrier === '1'
+                return request.parameters.barrier === barriers[0]
                     ? { buy: { contract_id: 501, buy_price: 1, payout: 2 } }
                     : { error: { code: 'PurchaseFailed', message: 'Purchase failed.' } };
             }

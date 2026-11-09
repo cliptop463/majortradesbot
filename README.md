@@ -76,13 +76,13 @@ also regenerate brand CSS — see Branding below.)
 ## Running a bulk strategy
 
 1. Open **Bulk Strategy** from the bot builder toolbar.
-2. Choose a strategy and market, then set the stake, profit target, and max loss. Tick Striker also has a bulk-size setting. Last-Ticks Matches instead has **Number of Recent Tick Digits** (1–10, default 5); it creates one independent one-tick DIGITMATCH contract per selected digit, preserving duplicates.
+2. Choose a strategy and market, then set the stake, profit target, and max loss. Tick Striker also has a bulk-size setting. Last-Ticks Matches instead has **Unique Matches per Batch** (1–10, default 5); it creates that many independent one-tick DIGITMATCH contracts with distinct barriers, ranked by lowest frequency and then longest time since seen over the last 100 ticks.
 3. Keep **Paper** selected to test with live market quotes without placing orders, then choose **Start Paper test**. Starting uses and saves the values currently shown; the separate **Save** button is optional.
 4. Use **Start Live trading** only when you are ready to place real or Demo-account orders. Live mode requires an authorized account, and enabling a Real account requires a separate confirmation.
 
 The modal displays any setup or safety-limit problems that must be fixed before starting. Use **Stop** to end a run; contracts already bought remain open on Deriv.
 
-Last-Ticks Matches runs sequential batches: every successful contract in the current batch must settle before the next batch collects N fresh ticks. Paper mode quotes each barrier separately and settles each simulated contract from its own next tick.
+Last-Ticks Matches runs sequential batches: every successful contract in the current batch must settle before the next batch collects N fresh ticks. Paper mode quotes each barrier separately and settles each simulated contract from its own next tick. Historical frequency/recency is only a heuristic; it cannot predict or guarantee a win, and a winning contract is not guaranteed to cover the losses in its batch. Review the quoted payouts and keep the stake and max-loss limits sized for the full batch.
 
 ## Step 4: Build for Production
 

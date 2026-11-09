@@ -426,7 +426,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                     {strategy && <p className='bulk-strategy-modal__hint'>{strategy.description}</p>}
                     {base.strategyId === 'last-ticks-matches' && (
                         <label className='bulk-strategy-modal__field' htmlFor='bulk-matches-tick-count'>
-                            <span>{localize('Number of Recent Tick Digits')}</span>
+                            <span>{localize('Unique Matches per Batch')}</span>
                             <input
                                 id='bulk-matches-tick-count'
                                 data-testid='dt_bulk_matchesTickCount'
