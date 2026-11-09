@@ -46,12 +46,14 @@ export async function fetchHistory(
         throw new Error(`API connection unavailable for ${symbol}`);
     }
 
-    const response = await api_base.api.send({
-        ticks_history: symbol,
-        end: 'latest',
-        count,
-        style: 'ticks',
-    });
+    const response = (await Promise.resolve(
+        api_base.api.send({
+            ticks_history: symbol,
+            end: 'latest',
+            count,
+            style: 'ticks',
+        })
+    )) as any;
 
     if ((response as { error?: { message?: string } })?.error) {
         const message = (response as { error?: { message?: string } }).error?.message || `Unable to fetch history for ${symbol}`;
@@ -86,14 +88,16 @@ export function selectVolatilityMarkets(symbols: readonly ActiveSymbol[]): Selec
         seenSymbols.add(underlyingSymbol);
 
         const displayName = sym.underlying_symbol_name || sym.display_name || underlyingSymbol;
+        const isSuspended = Number(sym.is_trading_suspended) === 1 || Boolean(sym.is_trading_suspended) === true;
+        const isClosed = Number(sym.exchange_is_open) === 0 || Boolean(sym.exchange_is_open) === false;
 
-        if (sym.is_trading_suspended === 1 || sym.is_trading_suspended === true) {
+        if (isSuspended) {
             skipped.push({
                 symbol: underlyingSymbol,
                 displayName,
                 reason: 'Trading suspended',
             });
-        } else if (sym.exchange_is_open === 0 || sym.exchange_is_open === false) {
+        } else if (isClosed) {
             skipped.push({
                 symbol: underlyingSymbol,
                 displayName,
@@ -130,7 +134,10 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  */
 export async function scanMarkets(
     markets: readonly ActiveSymbol[],
-    fetchHistoryFn: (symbol: string, count: number) => Promise<{ prices?: unknown; pip_size?: number | string | null }>,
+    fetchHistoryFn: (
+        symbol: string,
+        count: number
+    ) => Promise<{ prices?: unknown[]; pip_size?: number | string | null }> | { prices?: unknown[]; pip_size?: number | string | null },
     options?: ScanMarketsOptions
 ): Promise<MarketAnalysis[]> {
     const count = options?.count ?? SCAN_DEFAULTS.count;
@@ -159,9 +166,9 @@ export async function scanMarkets(
             };
         }
 
-        let rawHistory: { prices?: unknown; pip_size?: number | string | null };
+        let rawHistory: { prices?: unknown[]; pip_size?: number | string | null };
         try {
-            rawHistory = await withTimeout(fetchHistoryFn(symbol, count), timeoutMs);
+            rawHistory = await withTimeout(Promise.resolve(fetchHistoryFn(symbol, count)), timeoutMs);
         } catch (err) {
             return {
                 symbol,

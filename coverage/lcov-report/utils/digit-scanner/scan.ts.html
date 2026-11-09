@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">88.39% </span>
+                <span class="strong">88.66% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>259/293</span>
+                <span class='fraction'>266/300</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">88.39% </span>
+                <span class="strong">88.66% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>259/293</span>
+                <span class='fraction'>266/300</span>
             </div>
         
             
@@ -356,7 +356,14 @@
 <a name='L291'></a><a href='#L291'>291</a>
 <a name='L292'></a><a href='#L292'>292</a>
 <a name='L293'></a><a href='#L293'>293</a>
-<a name='L294'></a><a href='#L294'>294</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -403,6 +410,8 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -443,6 +452,8 @@
 <span class="cline-any cline-yes">5x</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
@@ -487,6 +498,9 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
 <span class="cline-any cline-yes">7x</span>
@@ -697,12 +711,14 @@ export async function fetchHistory(
 <span class="cstat-no" title="statement not covered" >        throw new Error(`API connection unavailable for ${symbol}`);</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
 &nbsp;
-    const response = await api_base.api.send({
-        ticks_history: symbol,
-        end: 'latest',
-        count,
-        style: 'ticks',
-    });
+    const response = (await Promise.resolve(
+        api_base.api.send({
+            ticks_history: symbol,
+            end: 'latest',
+            count,
+            style: 'ticks',
+        })
+    )) as any;
 &nbsp;
     if ((response as { error?: { message?: string } })?.error) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
 <span class="cstat-no" title="statement not covered" >        const message = (response as { error?: { message?: string } }).error?.message || `Unable to fetch history for ${symbol}`;</span>
@@ -737,14 +753,16 @@ export function selectVolatilityMarkets(symbols: readonly ActiveSymbol[]): Selec
         seenSymbols.add(underlyingSymbol);
 &nbsp;
         const displayName = sym.underlying_symbol_name<span class="branch-0 cbranch-no" title="branch not covered" > || sym.display_name<span class="branch-0 cbranch-no" title="branch not covered" > </span>|| underlyingSymbol;</span>
+        const isSuspended = Number(sym.is_trading_suspended) === 1 || Boolean(sym.is_trading_suspended) === true;
+        const isClosed = Number(sym.exchange_is_open) === 0 || Boolean(sym.exchange_is_open) === false;
 &nbsp;
-        if (sym.is_trading_suspended === 1 || sym.is_trading_suspended === true) {
+        if (isSuspended) {
             skipped.push({
                 symbol: underlyingSymbol,
                 displayName,
                 reason: 'Trading suspended',
             });
-        } else if (sym.exchange_is_open === 0 || sym.exchange_is_open === false) {
+        } else if (isClosed) {
             skipped.push({
                 symbol: underlyingSymbol,
                 displayName,
@@ -781,7 +799,10 @@ function withTimeout&lt;T&gt;(promise: Promise&lt;T&gt;, ms: number): Promise&lt
  */
 export async function scanMarkets(
     markets: readonly ActiveSymbol[],
-    fetchHistoryFn: (symbol: string, count: number) =&gt; Promise&lt;{ prices?: unknown; pip_size?: number | string | null }&gt;,
+    fetchHistoryFn: (
+        symbol: string,
+        count: number
+    ) =&gt; Promise&lt;{ prices?: unknown[]; pip_size?: number | string | null }&gt; | { prices?: unknown[]; pip_size?: number | string | null },
     options?: ScanMarketsOptions
 ): Promise&lt;MarketAnalysis[]&gt; {
     const count = options?.count<span class="branch-0 cbranch-no" title="branch not covered" > ?? SCAN_DEFAULTS.count;</span>
@@ -810,9 +831,9 @@ export async function scanMarkets(
 <span class="cstat-no" title="statement not covered" >            };</span>
 <span class="cstat-no" title="statement not covered" >        }</span>
 &nbsp;
-        let rawHistory: { prices?: unknown; pip_size?: number | string | null };
+        let rawHistory: { prices?: unknown[]; pip_size?: number | string | null };
         try {
-            rawHistory = await withTimeout(fetchHistoryFn(symbol, count), timeoutMs);
+            rawHistory = await withTimeout(Promise.resolve(fetchHistoryFn(symbol, count)), timeoutMs);
         } catch (err) {
             return {
                 symbol,
@@ -949,7 +970,7 @@ export async function scanMarkets(
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-08T00:52:05.718Z
+                at 2026-11-08T03:36:54.574Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

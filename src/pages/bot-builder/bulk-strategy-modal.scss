@@ -71,6 +71,37 @@
         margin-bottom: 1.2rem;
     }
 
+    &__matches-controls {
+        margin: 0.8rem 0;
+        padding-top: 0.8rem;
+        border-top: 1px solid var(--border-normal);
+    }
+
+    &__matches-preview {
+        padding-top: 0.8rem;
+        border-top: 2px solid var(--border-normal);
+        overflow-wrap: anywhere;
+
+        h3 {
+            margin: 0 0 0.6rem;
+            font-size: 1.3rem;
+        }
+
+        p {
+            margin: 0.4rem 0;
+            font-size: 1.1rem;
+        }
+
+        .bulk-strategy-modal__table {
+            min-width: 62rem;
+        }
+    }
+
+    &__matches-result {
+        color: var(--status-success, #4bb4b3);
+        font-weight: 600;
+    }
+
     &__setup {
         margin: 0 0 1rem;
         padding: 0.8rem;

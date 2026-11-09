@@ -77,7 +77,9 @@ const fireFieldChange = (block: any, fieldName: string, before: string | number 
     if (!block || !window?.Blockly?.Events) return;
     if (before === after) return;
 
-    const event = new window.Blockly.Events.BlockChange(block, 'field', fieldName, before, after);
+    const previousValue = String(before ?? '');
+    const nextValue = String(after ?? '');
+    const event = new window.Blockly.Events.BlockChange(block, 'field', fieldName, previousValue, nextValue);
     window.Blockly.Events.fire(event);
 };
 

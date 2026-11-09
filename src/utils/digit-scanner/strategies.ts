@@ -21,7 +21,7 @@ export const STRATEGY_MIN_OBSERVATIONS = {
     cycles: 200,
 } as const;
 
-export const THRESHOLDS = {
+export const THRESHOLDS: Record<string, number> = {
     zMatch: 2.8,
     zDiff: -2.8,
     streakMin: 4,
@@ -30,7 +30,7 @@ export const THRESHOLDS = {
     transitionsMinSuccessors: 30,
     gapMin: 29,
     cycleZMin: 3.8,
-} as const;
+};
 
 export interface DecideFromZResult {
     direction: Direction;

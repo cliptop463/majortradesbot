@@ -3,6 +3,9 @@ declare global {
     let google: any;
     interface Window {
         sendRequestsStatistic: (is_running: boolean) => void;
+        run_panel?: {
+            is_running?: boolean;
+        };
     }
 }
 
