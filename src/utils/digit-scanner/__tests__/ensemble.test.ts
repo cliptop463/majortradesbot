@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { analyzeDigits, rankMarkets } from '../ensemble';
+import { decideFromZ } from '../strategies';
 import type { MarketAnalysis, StrategyResult } from '../types';
 
 const signal = (
@@ -94,6 +95,56 @@ describe('analyzeDigits consensus', () => {
         });
         // eligible = 4; agreement share = 2/4; mean strength = .7
         expect(result.recommendation?.heuristicScore).toBe(56);
+    });
+
+    it('returns no consensus when winning vote is below minAgree', () => {
+        const s1 = (): StrategyResult => ({
+            id: 's1',
+            name: 'S1',
+            status: 'signal',
+            direction: 'MATCHES',
+            digit: 7,
+            strength: 0.8,
+            reason: 'r1',
+        });
+        const s2 = (): StrategyResult => ({
+            id: 's2',
+            name: 'S2',
+            status: 'abstain',
+            reason: 'r2',
+        });
+
+        const result = analyzeDigits([1, 2, 3], { minAgree: 2, strategies: [s1, s2] });
+        expect(result.recommendation).toBeNull();
+        expect(result.reason).toContain('2 required');
+    });
+
+    describe('tie-breaking order', () => {
+        it('uses mean strength when vote counts are tied', () => {
+            const stronger = signal('stronger', 'MATCHES', 3, 0.9);
+            const weaker = signal('weaker', 'DIFFERS', 4, 0.4);
+            expect(analyzeDigits([1, 2], { minAgree: 1, strategies: [stronger, weaker] }).recommendation?.direction).toBe('MATCHES');
+        });
+
+        it('prefers DIFFERS and then the lower digit on exact ties', () => {
+            const tiedDirections = analyzeDigits([1, 2, 3], {
+                minAgree: 1,
+                strategies: [signal('m', 'MATCHES', 5, 0.7), signal('d', 'DIFFERS', 5, 0.7)],
+            });
+            expect(tiedDirections.recommendation?.direction).toBe('DIFFERS');
+            const tiedDigits = analyzeDigits([1, 2, 3], {
+                minAgree: 1,
+                strategies: [signal('nine', 'DIFFERS', 9, 0.7), signal('two', 'DIFFERS', 2, 0.7)],
+            });
+            expect(tiedDigits.recommendation?.digit).toBe(2);
+        });
+
+        it('uses the strategy strength rule when both z-score extremes qualify', () => {
+            const zScores = new Array(10).fill(0);
+            zScores[2] = 4;
+            zScores[8] = -3;
+            expect(decideFromZ(zScores)).toMatchObject({ direction: 'MATCHES', digit: 2 });
+        });
     });
 });
 

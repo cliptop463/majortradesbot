@@ -4,6 +4,8 @@ import type { Direction } from './digit-scanner/types';
 export type ScannerPickDirection = Direction;
 
 export type ScannerPickInput = {
+    market: string;
+    submarket: string;
     symbol: string;
     direction: ScannerPickDirection;
     /** Prediction digit. Required for Matches/Differs and Over/Under; ignored for Even/Odd. */
@@ -17,6 +19,9 @@ export type ScannerPickFieldPreview = {
 
 export type ScannerPickPreview = {
     ok: true;
+    direction: ScannerPickDirection;
+    market: ScannerPickFieldPreview;
+    submarket: ScannerPickFieldPreview;
     symbol: ScannerPickFieldPreview;
     /** Trade type category field (TRADETYPECAT_LIST), set to 'digits'. */
     category: ScannerPickFieldPreview;
@@ -38,6 +43,8 @@ export type ScannerPickFailure = {
 export type ScannerPickResult = ScannerPickPreview | ScannerPickFailure;
 
 const FIELD_NAMES = {
+    market: 'MARKET_LIST',
+    submarket: 'SUBMARKET_LIST',
     symbol: 'SYMBOL_LIST',
     type: 'TYPE_LIST',
     prediction: 'PREDICTION',
@@ -142,6 +149,19 @@ const findRequiredBlocks = (workspace: any) => {
                 tradeTypeBlocks.length === 0
                     ? 'Missing trade_definition_tradetype block.'
                     : 'Duplicate trade_definition_tradetype blocks found.',
+        };
+    }
+
+    const requiredBlocks = [
+        ...marketBlocks,
+        ...contractTypeBlocks,
+        ...tradeOptionBlocks,
+        ...tradeTypeBlocks,
+    ];
+    if (requiredBlocks.some((block: any) => typeof block?.getRootBlock === 'function' && block.getRootBlock() !== tradeDefinition)) {
+        return {
+            ok: false as const,
+            reason: 'Required scanner blocks are not connected to the trade_definition block.',
         };
     }
 
@@ -327,6 +347,8 @@ export const previewScannerPick = (workspace: any, pick: ScannerPickInput): Scan
             return blocked(`Required field ${missingField} was not found on its block.`);
         }
 
+        const marketBefore = getFieldValue(marketBlock, FIELD_NAMES.market);
+        const submarketBefore = getFieldValue(marketBlock, FIELD_NAMES.submarket);
         const symbolBefore = getFieldValue(marketBlock, FIELD_NAMES.symbol);
         const typeBefore = getContractTypeValue(contractTypeBlock);
         const predictionBefore = getPredictionValue(predictionBlock);
@@ -338,6 +360,9 @@ export const previewScannerPick = (workspace: any, pick: ScannerPickInput): Scan
 
         return {
             ok: true,
+            direction: pick.direction,
+            market: { before: marketBefore, after: pick.market ?? marketBefore },
+            submarket: { before: submarketBefore, after: pick.submarket ?? submarketBefore },
             symbol: { before: symbolBefore, after: symbolAfter },
             category: { before: categoryBefore, after: 'digits' },
             tradeType: { before: tradeTypeBefore, after: spec.tradeType },
@@ -375,10 +400,14 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
 
         const spec = CONTRACTS[pick.direction];
         const targetType = spec.typeValue;
+        const targetMarket = pick.market;
+        const targetSubmarket = pick.submarket;
         const targetSymbol = pick.symbol;
         const targetDigit = spec.hasBarrier ? (pick.digit as number) : null;
 
         const readState = () => ({
+            market: getFieldValue(marketBlock, FIELD_NAMES.market),
+            submarket: getFieldValue(marketBlock, FIELD_NAMES.submarket),
             symbol: getFieldValue(marketBlock, FIELD_NAMES.symbol),
             category: getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeTypeCategory),
             tradeType: getFieldValue(tradeTypeBlock, FIELD_NAMES.tradeType),
@@ -390,6 +419,8 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
         // Blockly refreshes these dropdowns asynchronously after the contracts API answers, and a late
         // refresh can put an older value back. A pick only counts once every field holds the target.
         const matchesTarget = (st: State) =>
+            (!pick.market || st.market === targetMarket) &&
+            (!pick.submarket || st.submarket === targetSubmarket) &&
             st.symbol === targetSymbol &&
             String(st.category ?? '').trim() === 'digits' &&
             String(st.tradeType ?? '').trim() === spec.tradeType &&
@@ -397,12 +428,35 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
             (targetDigit === null || String(st.prediction) === String(targetDigit));
 
         const describeState = (st: State) =>
-            `symbol ${st.symbol ?? '-'}, trade type ${st.category ?? '-'} > ${st.tradeType ?? '-'}, contract ${st.type ?? '-'}` +
+            `market ${st.market ?? '-'} > ${st.submarket ?? '-'} > ${st.symbol ?? '-'}, trade type ${st.category ?? '-'} > ${st.tradeType ?? '-'}, contract ${st.type ?? '-'}` +
             (targetDigit !== null ? `, digit ${st.prediction ?? '-'}` : '');
 
         const initial = readState();
 
         const applySteps = async (): Promise<ScannerPickFailure | { ok: true }> => {
+            if (pick.market && getFieldValue(marketBlock, FIELD_NAMES.market) !== targetMarket) {
+                const marketNow = getFieldValue(marketBlock, FIELD_NAMES.market);
+                if (!(await waitForFieldOption(marketBlock, FIELD_NAMES.market, targetMarket))) {
+                    return { ok: false, reason: `Market ${targetMarket} is unavailable in the bot workspace.` };
+                }
+                setFieldValue(marketBlock, FIELD_NAMES.market, targetMarket);
+                fireFieldChange(marketBlock, FIELD_NAMES.market, marketNow, targetMarket);
+                await sleep(250);
+            }
+
+            if (pick.submarket && getFieldValue(marketBlock, FIELD_NAMES.submarket) !== targetSubmarket) {
+                const submarketNow = getFieldValue(marketBlock, FIELD_NAMES.submarket);
+                if (!(await waitForFieldOption(marketBlock, FIELD_NAMES.submarket, targetSubmarket))) {
+                    return {
+                        ok: false,
+                        reason: `Submarket ${targetSubmarket} is unavailable for ${targetMarket}.`,
+                    };
+                }
+                setFieldValue(marketBlock, FIELD_NAMES.submarket, targetSubmarket);
+                fireFieldChange(marketBlock, FIELD_NAMES.submarket, submarketNow, targetSubmarket);
+                await sleep(250);
+            }
+
             const symbolNow = getFieldValue(marketBlock, FIELD_NAMES.symbol);
             if (symbolNow !== targetSymbol) {
                 setFieldValue(marketBlock, FIELD_NAMES.symbol, targetSymbol);
@@ -470,6 +524,9 @@ export const applyScannerPick = async (workspace: any, pick: ScannerPickInput): 
                         workspace?.render?.();
                         return {
                             ok: true,
+                            direction: pick.direction,
+                            market: { before: initial.market, after: targetMarket ?? initial.market },
+                            submarket: { before: initial.submarket, after: targetSubmarket ?? initial.submarket },
                             symbol: { before: initial.symbol, after: targetSymbol },
                             category: preview.category,
                             tradeType: preview.tradeType,

@@ -46,8 +46,8 @@ export function decideFromZ(
     maybeOptions?: { zMatch?: number; zDiff?: number }
 ): DecideFromZResult | null {
     let zScores: number[];
-    let zMatch = THRESHOLDS.zMatch;
-    let zDiff = THRESHOLDS.zDiff;
+    let zMatch: number = THRESHOLDS.zMatch;
+    let zDiff: number = THRESHOLDS.zDiff;
 
     if (typeof nOrOptions === 'number') {
         const n = nOrOptions;
