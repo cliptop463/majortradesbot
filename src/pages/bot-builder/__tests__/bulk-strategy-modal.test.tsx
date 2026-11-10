@@ -125,6 +125,31 @@ describe('defaults and saved settings', () => {
         ]);
     });
 
+    it('scans all volatility markets and selects the market with the highest initial score', async () => {
+        api.responders.unshift(req =>
+            req.ticks_history && !req.subscribe ? { history: { prices: trainingTicks() } } : undefined
+        );
+        renderOpen(<BulkStrategyModal {...props()} />);
+
+        fireEvent.click(screen.getByTestId('dt_bulk_scan_markets'));
+        await waitFor(
+            () => expect(screen.getByTestId('dt_bulk_scan_status').textContent).not.toContain('Scanning markets'),
+            { timeout: 15_000 }
+        );
+
+        const scanRequests = api.sent.filter(request => request.ticks_history);
+        expect(scanRequests).toHaveLength(10);
+        expect(scanRequests.every(request => !request.subscribe)).toBe(true);
+
+        const ranked = Array.from(screen.getByTestId('dt_bulk_scan_results').querySelectorAll('button'));
+        expect(ranked).toHaveLength(10);
+        expect(screen.getByTestId('dt_bulk_market').value).toBe(ranked[0].getAttribute('data-market'));
+        expect(screen.getByTestId('dt_bulk_scan_status').textContent).toContain('Selected');
+
+        fireEvent.click(ranked[ranked.length - 1]);
+        expect(screen.getByTestId('dt_bulk_market').value).toBe(ranked[ranked.length - 1].getAttribute('data-market'));
+    });
+
     it('shows and saves the Matches batch size only for that strategy', () => {
         renderOpen(<BulkStrategyModal {...props()} />);
         expect(screen.queryByTestId('dt_bulk_matchesTickCount')).toBeNull();

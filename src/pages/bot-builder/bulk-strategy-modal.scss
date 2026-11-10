@@ -299,6 +299,43 @@
         overflow-wrap: anywhere;
     }
 
+    &__scan-results {
+        display: grid;
+        gap: 0.4rem;
+        margin: 0.8rem 0;
+        padding: 0;
+        list-style: none;
+
+        button {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.3rem 0.8rem;
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border: 1px solid var(--border-normal);
+            border-radius: 0.4rem;
+            background: transparent;
+            color: var(--text-prominent);
+            text-align: left;
+            cursor: pointer;
+
+            &[aria-pressed='true'] {
+                border-color: var(--button-primary-default);
+            }
+
+            &:disabled {
+                cursor: default;
+                opacity: 0.65;
+            }
+        }
+
+        small {
+            grid-column: 1 / -1;
+            color: var(--text-less-prominent);
+            overflow-wrap: anywhere;
+        }
+    }
+
     &__table-wrap {
         max-height: 20rem;
         overflow: auto; // the log scrolls both ways

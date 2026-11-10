@@ -43,6 +43,7 @@ type Props = {
 
 type RunState = 'idle' | 'starting' | 'running' | 'stopping';
 type NumberText = { stake: string; profitTarget: string; maxLoss: string; bulkSize: string; matchesTickCount: string; multiplier: string; maxSteps: string };
+type MarketScanResult = { symbol: string; score: number | null; reason: string | null };
 
 const parse = (text: string) => (text.trim() === '' ? NaN : Number(text));
 const toText = (c: BulkConfig): NumberText => ({
@@ -101,6 +102,10 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
     const [show_settings, setShowSettings] = React.useState(false);
     const [quick_symbol, setQuickSymbol] = React.useState(() => loadConfig().symbol);
     const [running_config, setRunningConfig] = React.useState<BulkConfig | null>(null);
+    const [is_scanning, setIsScanning] = React.useState(false);
+    const [scan_progress, setScanProgress] = React.useState(0);
+    const [scan_results, setScanResults] = React.useState<MarketScanResult[]>([]);
+    const [scan_message, setScanMessage] = React.useState('');
 
     const engine = React.useRef<BulkEngine | null>(null);
     const is_mounted = React.useRef(true);
@@ -184,6 +189,78 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
     const handleSave = () => {
         if (saveConfig(config)) setSaved(true);
         else setErrorMsg(localize('Settings could not be saved in this browser.'));
+    };
+
+    const scanMarkets = async () => {
+        if (is_scanning || is_active || is_running || base.strategyId !== 'tick-striker') return;
+        const scanStrategy = getStrategy('tick-striker');
+        if (!scanStrategy) {
+            setScanMessage(localize('Tick Striker is unavailable, so markets could not be scanned.'));
+            return;
+        }
+
+        setIsScanning(true);
+        setScanProgress(0);
+        setScanResults([]);
+        setScanMessage(localize('Scanning recent ticks across all volatility markets…'));
+        const api = createDerivApi();
+        const results: MarketScanResult[] = [];
+
+        for (const symbol of MARKETS) {
+            try {
+                const response = await api.send({
+                    ticks_history: symbol,
+                    adjust_start_time: 1,
+                    count: scanStrategy.bufferSize,
+                    end: 'latest',
+                    style: 'ticks',
+                });
+                if (response?.error) throw new Error(response.error.message || response.error.code || 'Deriv returned an error.');
+                const prices = Array.isArray(response?.history?.prices)
+                    ? response.history.prices.map(Number).filter(Number.isFinite)
+                    : [];
+                if (prices.length === 0) throw new Error(localize('No recent tick data was returned.'));
+
+                const signal = scanStrategy.evaluate(prices);
+                results.push({
+                    symbol,
+                    score: signal.score,
+                    reason: signal.score === null ? signal.reason : null,
+                });
+            } catch (error) {
+                results.push({
+                    symbol,
+                    score: null,
+                    reason: error instanceof Error ? error.message : String(error),
+                });
+            }
+            if (!is_mounted.current) return;
+            setScanResults([...results]);
+            setScanProgress(results.length);
+        }
+
+        if (!is_mounted.current) return;
+        const ranked = results
+            .filter((result): result is MarketScanResult & { score: number } => result.score !== null)
+            .sort((a, b) => b.score - a.score);
+        const best = ranked[0];
+        if (best) {
+            patch({ symbol: best.symbol });
+            setScanMessage(
+                best.score >= 0.3
+                    ? localize('Selected {{market}} with the highest initial score: {{score}}.', {
+                          market: best.symbol,
+                          score: best.score.toFixed(3),
+                      })
+                    : localize('Selected {{market}} as the strongest available ({{score}}), but no market reached 0.30.', {
+                          market: best.symbol,
+                          score: best.score.toFixed(3),
+                      })
+            );
+        } else {
+            setScanMessage(localize('No markets produced a usable score. Check the connection and try again.'));
+        }
+        setIsScanning(false);
     };
 
     const start = async (override?: BulkConfig) => {
@@ -292,7 +369,10 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
             : localize('Run Live strategy');
     // The quick test is always valid, so only the advanced path can be blocked by its settings.
     const action_disabled =
-        run_state === 'starting' || run_state === 'stopping' || (run_state === 'idle' && show_settings && problems.length > 0);
+        is_scanning ||
+        run_state === 'starting' ||
+        run_state === 'stopping' ||
+        (run_state === 'idle' && show_settings && problems.length > 0);
     const handleAction = () => {
         if (run_state === 'running') return stop();
         return show_settings ? start() : startQuick();
@@ -414,7 +494,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                         data-testid='dt_bulk_strategy'
                         className='bulk-strategy-modal__select'
                         value={base.strategyId}
-                        disabled={locked}
+                        disabled={locked || is_scanning}
                         onChange={e => patch({ strategyId: e.target.value })}
                     >
                         {listStrategies().map(s => (
@@ -450,7 +530,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                         data-testid='dt_bulk_market'
                         className='bulk-strategy-modal__select'
                         value={base.symbol}
-                        disabled={locked}
+                        disabled={locked || is_scanning}
                         onChange={e => patch({ symbol: e.target.value })}
                     >
                         {MARKETS.map(symbol => (
@@ -459,6 +539,53 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                             </option>
                         ))}
                     </select>
+                    <div className='bulk-strategy-modal__actions'>
+                        <button
+                            type='button'
+                            className='bulk-strategy-modal__button'
+                            data-testid='dt_bulk_scan_markets'
+                            disabled={locked || is_scanning || is_running || base.strategyId !== 'tick-striker'}
+                            onClick={scanMarkets}
+                        >
+                            {is_scanning
+                                ? localize('Scanning markets ({{done}}/{{total}})…', { done: scan_progress, total: MARKETS.length })
+                                : localize('Scan markets for highest score')}
+                        </button>
+                    </div>
+                    <p className='bulk-strategy-modal__hint'>
+                        {base.strategyId === 'tick-striker'
+                            ? localize('Compares each market using its latest available ticks and selects the highest score. A score of 0.30 is only a screening target, not a win probability or guarantee.')
+                            : localize('Market scanning uses the Tick Striker score. Select Tick Striker to scan markets.')}
+                    </p>
+                    {scan_message && (
+                        <p className='bulk-strategy-modal__status' data-testid='dt_bulk_scan_status' role='status'>
+                            {is_scanning
+                                ? localize('Scanning markets ({{done}}/{{total}})…', { done: scan_progress, total: MARKETS.length })
+                                : scan_message}
+                        </p>
+                    )}
+                    {scan_results.length > 0 && (
+                        <ol className='bulk-strategy-modal__scan-results' data-testid='dt_bulk_scan_results'>
+                            {[...scan_results]
+                                .sort((a, b) => (b.score ?? -1) - (a.score ?? -1))
+                                .map(result => (
+                                    <li key={result.symbol}>
+                                        <button
+                                            type='button'
+                                            data-testid={`dt_bulk_scan_result_${result.symbol}`}
+                                            data-market={result.symbol}
+                                            aria-pressed={base.symbol === result.symbol}
+                                            disabled={is_scanning || result.score === null}
+                                            onClick={() => patch({ symbol: result.symbol })}
+                                        >
+                                            <span>{`${volatilityName(result.symbol)} (${result.symbol})`}</span>
+                                            <strong>{result.score === null ? '–' : result.score.toFixed(3)}</strong>
+                                            {result.reason && <small>{result.reason}</small>}
+                                        </button>
+                                    </li>
+                                ))}
+                        </ol>
+                    )}
                 </section>
 
                 {/* ─── Risk, sizing and limits ─── */}
