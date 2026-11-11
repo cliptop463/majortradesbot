@@ -1,5 +1,5 @@
 
-// @ts-nocheck — vendored bot code with known upstream type gaps; see AGENTS.md
+// @ts-nocheck ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â vendored bot code with known upstream type gaps; see AGENTS.md
 
 import React from 'react';
 import { observer } from 'mobx-react-lite';
@@ -15,6 +15,7 @@ import WorkspaceGroup from './toolbar/workspace-group';
 import DigitScannerModal from './digit-scanner-modal';
 import MatchesDiffersModal from './matches-differs-modal';
 import BulkStrategyModal from './bulk-strategy-modal';
+import RepeatMatchesModal from './repeat-matches-modal';
 
 // Load the existing toolbar styles
 import './toolbar/toolbar.scss';
@@ -50,6 +51,8 @@ const Toolbar = observer(() => {
 
     const [is_bulk_open, setIsBulkOpen] = React.useState(false);
     const [is_bulk_running, setIsBulkRunning] = React.useState(false);
+    const [is_repeat_matches_open, setIsRepeatMatchesOpen] = React.useState(false);
+    const [is_repeat_matches_running, setIsRepeatMatchesRunning] = React.useState(false);
 
     // Open Quick Strategy
     const handleQuickStrategyOpen = () => {
@@ -139,10 +142,18 @@ const Toolbar = observer(() => {
                         buttonOnClick={() => setIsBulkOpen(true)}
                         button_text={
                             is_bulk_running
-                                ? `${localize('Bulk Strategy')} ●`
+                                ? `${localize('Bulk Strategy')} ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬ÂÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â`
                                 : localize('Bulk Strategy')
                         }
                         is_bot_running={false}
+                    />
+                    <ToolbarButton
+                        popover_message={localize("Buy a Matches contract on every tick using that tick's last digit, with five open contracts maximum.")}
+                        button_id='db-toolbar__repeat-matches-button'
+                        button_classname='toolbar__btn toolbar__btn--icon toolbar__btn--digit-scanner'
+                        buttonOnClick={() => setIsRepeatMatchesOpen(true)}
+                        button_text={is_repeat_matches_running ? localize('Repeat Matches') + ' *' : localize('Repeat Matches')}
+                        is_bot_running={is_running}
                     />
 
                     {isDesktop && <WorkspaceGroup />}
@@ -204,9 +215,14 @@ const Toolbar = observer(() => {
                 is_running={is_running}
                 onRunningChange={setIsBulkRunning}
             />
+            <RepeatMatchesModal
+                isOpen={is_repeat_matches_open}
+                onClose={() => setIsRepeatMatchesOpen(false)}
+                is_running={is_running}
+                onRunningChange={setIsRepeatMatchesRunning}
+            />
         </React.Fragment>
     );
 });
 
 export default Toolbar;
-                        
