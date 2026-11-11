@@ -27,6 +27,7 @@ export class RepeatMatchesEngine {
     private readonly paperOpen = new Set<number>();
     private nextSlot = 0;
     private tickSubscription: string | null = null;
+    private pipSize: number | null = null;
     private offMessage: (() => void) | null = null;
     private running = false;
     private placed = 0;
@@ -46,11 +47,13 @@ export class RepeatMatchesEngine {
         if (!Number.isFinite(this.config.stake) || this.config.stake <= 0) throw new Error('Stake must be greater than 0.');
         this.running = true;
         this.offMessage = this.api.onMessage(data => this.onMessage(data));
-        const response = await this.api.send({ ticks: this.config.symbol, subscribe: 1 });
+        const response = await this.api.send({ ticks_history: this.config.symbol, adjust_start_time: 1, count: 1, end: 'latest', style: 'ticks', subscribe: 1 });
         if (response?.error) {
             await this.stop();
             throw new Error(response.error.message || 'Could not subscribe to ticks.');
         }
+        const pipSize = Number(response?.history?.pip_size ?? response?.pip_size);
+        this.pipSize = Number.isInteger(pipSize) && pipSize >= 0 && pipSize <= 12 ? pipSize : null;
         this.tickSubscription = response?.subscription?.id ?? null;
     }
 
@@ -70,7 +73,7 @@ export class RepeatMatchesEngine {
 
     private onMessage(data: any) {
         if (!this.running || !data) return;
-        if (data.msg_type === 'tick' && data.tick && (!this.tickSubscription || data.subscription?.id === this.tickSubscription)) {
+        if (data.msg_type === 'tick' && data.tick && (!this.tickSubscription || !data.subscription?.id || data.subscription.id === this.tickSubscription)) {
             void this.onTick(data.tick);
             return;
         }
@@ -81,7 +84,9 @@ export class RepeatMatchesEngine {
     }
 
     private async onTick(tick: any) {
-        const digit = finalDigit(Number(tick.quote), Number(tick.pip_size));
+        const tickPipSize = Number(tick.pip_size);
+        const pipSize = Number.isInteger(tickPipSize) ? tickPipSize : this.pipSize;
+        const digit = pipSize === null ? null : finalDigit(Number(tick.quote), pipSize);
         this.paperOpen.forEach(slot => this.closePaper(slot));
         if (digit === null) {
             this.events.onTick?.({ digit: null, open: this.open.size, placed: this.placed, skipped: this.skipped });
@@ -102,7 +107,7 @@ export class RepeatMatchesEngine {
             return;
         }
         try {
-            const proposal = await this.api.send({ proposal: 1, amount: this.config.stake, basis: 'stake', contract_type: 'DIGITMATCH', currency: this.config.currency ?? 'USD', duration: 1, duration_unit: 't', symbol: this.config.symbol, barrier: String(digit) });
+            const proposal = await this.api.send({ proposal: 1, amount: this.config.stake, basis: 'stake', contract_type: 'DIGITMATCH', currency: this.config.currency ?? 'USD', duration: 1, duration_unit: 't', underlying_symbol: this.config.symbol, barrier: String(digit) });
             if (proposal?.error || !proposal?.proposal?.id) throw new Error(proposal?.error?.message || 'Could not get a contract proposal.');
             const buy = await this.api.send({ buy: proposal.proposal.id, price: this.config.stake });
             if (buy?.error || !buy?.buy?.contract_id) throw new Error(buy?.error?.message || 'Could not buy the contract.');

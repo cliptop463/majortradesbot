@@ -192,8 +192,8 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
     };
 
     const scanMarkets = async () => {
-        if (is_scanning || is_active || is_running || base.strategyId !== 'tick-striker') return;
-        const scanStrategy = getStrategy('tick-striker');
+        if (is_scanning || is_active || is_running || !['tick-striker', 'tick-striker-v4'].includes(base.strategyId)) return;
+        const scanStrategy = getStrategy(base.strategyId);
         if (!scanStrategy) {
             setScanMessage(localize('Tick Striker is unavailable, so markets could not be scanned.'));
             return;
@@ -544,7 +544,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                             type='button'
                             className='bulk-strategy-modal__button'
                             data-testid='dt_bulk_scan_markets'
-                            disabled={locked || is_scanning || is_running || base.strategyId !== 'tick-striker'}
+                            disabled={locked || is_scanning || is_running || !['tick-striker', 'tick-striker-v4'].includes(base.strategyId)}
                             onClick={scanMarkets}
                         >
                             {is_scanning
@@ -553,9 +553,9 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                         </button>
                     </div>
                     <p className='bulk-strategy-modal__hint'>
-                        {base.strategyId === 'tick-striker'
+                        {['tick-striker', 'tick-striker-v4'].includes(base.strategyId)
                             ? localize('Compares each market using its latest available ticks and selects the highest score. A score of 0.30 is only a screening target, not a win probability or guarantee.')
-                            : localize('Market scanning uses the Tick Striker score. Select Tick Striker to scan markets.')}
+                            : localize('Market scanning uses the Tick Striker score. Select Tick Striker V3 or V4 to scan markets.')}
                     </p>
                     {scan_message && (
                         <p className='bulk-strategy-modal__status' data-testid='dt_bulk_scan_status' role='status'>

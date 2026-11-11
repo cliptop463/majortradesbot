@@ -59,6 +59,7 @@ export default function RepeatMatchesModal({ isOpen, onClose, is_running, onRunn
                 <span>{localize('Placed')}: <strong>{placed}</strong></span>
                 <span>{localize('Skipped at cap')}: <strong>{skipped}</strong></span>
             </div>
+            {mode === 'paper' && <p className='repeat-matches-modal__hint'>{localize('Paper mode shows simulated placements and sends no buy orders. Choose Live to place real contracts.')}</p>}
             {mode === 'live' && <p className='repeat-matches-modal__warning'>{localize('Live mode places real contracts on every tick. Losses are possible.')}</p>}
             {error && <p className='repeat-matches-modal__error' role='alert'>{error}</p>}
             <div className='repeat-matches-modal__actions'>
