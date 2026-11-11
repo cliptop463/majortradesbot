@@ -121,6 +121,7 @@ describe('defaults and saved settings', () => {
         expect(markets).toEqual(expect.arrayContaining(['R_100', '1HZ100V']));
         expect(Array.from(screen.getByTestId('dt_bulk_strategy').options).map(o => o.textContent)).toEqual([
             'Tick Striker V3',
+            'Tick Striker V4',
             'Last-Ticks Matches',
         ]);
     });

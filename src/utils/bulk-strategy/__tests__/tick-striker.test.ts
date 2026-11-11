@@ -47,7 +47,7 @@ describe('Tick Striker contract', () => {
         expect(getStrategy('tick-striker')).toBe(tickStriker);
         expect(listStrategies()).toContain(tickStriker);
         expect(getStrategy('nope')).toBeUndefined();
-        expect(Object.keys(STRATEGIES)).toEqual(['tick-striker', 'last-ticks-matches']);
+        expect(Object.keys(STRATEGIES)).toEqual(['tick-striker', 'tick-striker-v4', 'last-ticks-matches']);
     });
 });
 
