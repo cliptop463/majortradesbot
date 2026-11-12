@@ -1,0 +1,532 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for utils/repeat-matches-engine.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">utils</a> repeat-matches-engine.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">84.56% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>126/149</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">42.22% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>19/45</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">77.77% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>7/9</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">84.56% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>126/149</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import type { BulkApi } from './bulk-strategy/types';
+&nbsp;
+export const MAX_REPEAT_MATCHES_CONTRACTS = 5;
+&nbsp;
+export interface RepeatMatchesConfig {
+    symbol: string;
+    stake: number;
+    mode: 'paper' | 'live';
+    currency?: string;
+}
+&nbsp;
+export interface RepeatMatchesEvents {
+    onTick?(info: { digit: number | null; open: number; placed: number; skipped: number }): void;
+    onContract?(info: { digit: number; contractId?: number; status: 'placed' | 'won' | 'lost' | 'failed' }): void;
+    onError?(message: string): void;
+    onStop?(): void;
+}
+&nbsp;
+type OpenContract = { contractId?: number; digit: number; subscriptionId?: string };
+&nbsp;
+/** Places a one-tick DIGITMATCH contract for the digit on every tick, with five-slot back pressure. */
+export class RepeatMatchesEngine {
+    private readonly config: RepeatMatchesConfig;
+    private readonly api: BulkApi;
+    private readonly events: RepeatMatchesEvents;
+    private readonly open = new Map&lt;number, OpenContract&gt;();
+    private readonly paperOpen = new Set&lt;number&gt;();
+    private nextSlot = 0;
+    private tickSubscription: string | null = null;
+    private pipSize: number | null = null;
+    private offMessage: (() =&gt; void) | null = null;
+    private running = false;
+    private placed = 0;
+    private skipped = 0;
+&nbsp;
+    constructor(config: RepeatMatchesConfig, api: BulkApi, events: RepeatMatchesEvents = {}) {
+        this.config = config;
+        this.api = api;
+        this.events = events;
+    }
+&nbsp;
+<span class="fstat-no" title="function not covered" >    getOpenCount() { return this.open.size; }</span>
+&nbsp;
+    async start() {
+        if (this.running) <span class="branch-0 cbranch-no" title="branch not covered" >throw new Error('This strategy is already running.');</span>
+        if (!this.config.symbol) <span class="branch-0 cbranch-no" title="branch not covered" >throw new Error('Choose a market.');</span>
+        if (!Number.isFinite(this.config.stake) || this.config.stake &lt;= 0) <span class="branch-0 cbranch-no" title="branch not covered" >throw new Error('Stake must be greater than 0.');</span>
+        this.running = true;
+        try {
+            this.offMessage = this.api.onMessage(data =&gt; this.onMessage(data));
+            const response = await this.api.send({ ticks_history: this.config.symbol, adjust_start_time: 1, count: 1, end: 'latest', style: 'ticks', subscribe: 1 });
+            if (response?.error) <span class="branch-0 cbranch-no" title="branch not covered" >throw new Error(response.error.message || 'Could not subscribe to ticks.');</span>
+            const pipSize = Number(response?.history?.pip_size<span class="branch-0 cbranch-no" title="branch not covered" > ?? response?.pip_size)</span>;
+            this.pipSize = Number.isInteger(pipSize) &amp;&amp; pipSize &gt;= 0 &amp;&amp; pipSize &lt;= 12 ? pipSize <span class="branch-0 cbranch-no" title="branch not covered" >: null;</span>
+            this.tickSubscription = response?.subscription?.id<span class="branch-0 cbranch-no" title="branch not covered" > ?? null;</span>
+        } <span class="branch-0 cbranch-no" title="branch not covered" >catch (error) {</span>
+<span class="cstat-no" title="statement not covered" >            await this.stop();</span>
+<span class="cstat-no" title="statement not covered" >            throw error;</span>
+<span class="cstat-no" title="statement not covered" >        }</span>
+    }
+&nbsp;
+    async stop() {
+        if (!this.running<span class="branch-0 cbranch-no" title="branch not covered" > &amp;&amp; !this.offMessage)</span> <span class="branch-0 cbranch-no" title="branch not covered" >return;</span>
+        this.running = false;
+        const ids = [...this.open.values()].map(contract =&gt; contract.subscriptionId).filter(Boolean) as string[];
+        if (this.tickSubscription) ids.push(this.tickSubscription);
+        this.tickSubscription = null;
+        this.offMessage?.();
+        this.offMessage = null;
+        await Promise.allSettled(ids.map(id =&gt; this.api.send({ forget: id })));
+        this.open.clear();
+        this.paperOpen.clear();
+        this.events.onStop<span class="branch-0 cbranch-no" title="branch not covered" >?.();</span>
+    }
+&nbsp;
+    private onMessage(data: any) {
+        if (!this.running || !data) <span class="branch-0 cbranch-no" title="branch not covered" >return;</span>
+        if (data.msg_type === 'tick' &amp;&amp; data.tick &amp;&amp; (!this.tickSubscription || !data.subscription?.id || data.subscription.id === this.tickSubscription)) {
+            void this.onTick(data.tick);
+            return;
+        }
+<span class="branch-0 cbranch-no" title="branch not covered" >        if (data.msg_type === 'proposal_open_contract' &amp;&amp; data.proposal_open_contract)</span> <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >            const poc = data.proposal_open_contract;</span>
+<span class="cstat-no" title="statement not covered" >            if (poc.is_sold || poc.status === 'sold') this.settle(Number(poc.contract_id), Number(poc.profit) &gt; 0);</span>
+<span class="cstat-no" title="statement not covered" >        }</span>
+    }
+&nbsp;
+    private async onTick(tick: any) {
+        const tickPipSize = Number(tick.pip_size);
+        const pipSize = Number.isInteger(tickPipSize) <span class="branch-0 cbranch-no" title="branch not covered" >? tickPipSize </span>: this.pipSize;
+        const digit = pipSize === null <span class="branch-0 cbranch-no" title="branch not covered" >? null </span>: finalDigit(Number(tick.quote), pipSize);
+        this.paperOpen.forEach(slot =&gt; this.closePaper(slot));
+        if (digit === null) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >            this.events.onTick?.({ digit: null, open: this.open.size, placed: this.placed, skipped: this.skipped });</span>
+<span class="cstat-no" title="statement not covered" >            return;</span>
+<span class="cstat-no" title="statement not covered" >        }</span>
+        if (this.open.size &gt;= MAX_REPEAT_MATCHES_CONTRACTS) <span class="branch-0 cbranch-no" title="branch not covered" >{</span>
+<span class="cstat-no" title="statement not covered" >            this.skipped++;</span>
+<span class="cstat-no" title="statement not covered" >            this.events.onTick?.({ digit, open: this.open.size, placed: this.placed, skipped: this.skipped });</span>
+<span class="cstat-no" title="statement not covered" >            return;</span>
+<span class="cstat-no" title="statement not covered" >        }</span>
+        const slot = this.nextSlot++;
+        this.open.set(slot, { digit });
+        if (this.config.mode === 'paper') {
+            this.paperOpen.add(slot);
+            this.placed++;
+            this.events.onContract?.({ digit, status: 'placed' });
+            this.events.onTick<span class="branch-0 cbranch-no" title="branch not covered" >?.({ digit, open: this.open.size, placed: this.placed, skipped: this.skipped });</span>
+            return;
+        }
+        try {
+            const proposal = await this.api.send({ proposal: 1, amount: this.config.stake, basis: 'stake', contract_type: 'DIGITMATCH', currency: this.config.currency ?? 'USD', duration: 1, duration_unit: 't', underlying_symbol: this.config.symbol, barrier: String(digit) });
+            if (proposal?.error || !proposal?.proposal?.id) <span class="branch-0 cbranch-no" title="branch not covered" >throw new Error(proposal?.error?.message || 'Could not get a contract proposal.');</span>
+            const buy = await this.api.send({ buy: proposal.proposal.id, price: this.config.stake });
+            if (buy?.error || !buy?.buy?.contract_id) <span class="branch-0 cbranch-no" title="branch not covered" >throw new Error(buy?.error?.message || 'Could not buy the contract.');</span>
+            const contractId = Number(buy.buy.contract_id);
+            const poc = await this.api.send({ proposal_open_contract: 1, contract_id: contractId, subscribe: 1 });
+            const subscriptionId = poc?.subscription?.id;
+            this.open.set(slot, { digit, contractId, subscriptionId });
+            this.placed++;
+            this.events.onContract<span class="branch-0 cbranch-no" title="branch not covered" >?.({ digit, contractId, status: 'placed' });</span>
+        } <span class="branch-0 cbranch-no" title="branch not covered" >catch (error) {</span>
+<span class="cstat-no" title="statement not covered" >            this.open.delete(slot);</span>
+<span class="cstat-no" title="statement not covered" >            this.events.onContract?.({ digit, status: 'failed' });</span>
+<span class="cstat-no" title="statement not covered" >            this.events.onError?.(error instanceof Error ? error.message : String(error));</span>
+<span class="cstat-no" title="statement not covered" >        }</span>
+        this.events.onTick<span class="branch-0 cbranch-no" title="branch not covered" >?.({ digit, open: this.open.size, placed: this.placed, skipped: this.skipped });</span>
+    }
+&nbsp;
+    private closePaper(slot: number) { this.paperOpen.delete(slot); this.open.delete(slot); }
+&nbsp;
+    private <span class="fstat-no" title="function not covered" >settle(contractId: number, won: boolean) {</span>
+<span class="cstat-no" title="statement not covered" >        const entry = [...this.open.entries()].find(([, contract]) =&gt; contract.contractId === contractId);</span>
+<span class="cstat-no" title="statement not covered" >        if (!entry) return;</span>
+<span class="cstat-no" title="statement not covered" >        const [slot, contract] = entry;</span>
+<span class="cstat-no" title="statement not covered" >        this.open.delete(slot);</span>
+<span class="cstat-no" title="statement not covered" >        this.events.onContract?.({ digit: contract.digit, contractId, status: won ? 'won' : 'lost' });</span>
+<span class="cstat-no" title="statement not covered" >    }</span>
+}
+&nbsp;
+export function finalDigit(quote: number, pipSize: number): number | null {
+    if (!Number.isFinite(quote) || !Number.isInteger(pipSize) || pipSize &lt; 0 || pipSize &gt; 12) <span class="branch-0 cbranch-no" title="branch not covered" >return null;</span>
+    const [mantissa, exponentText = '0'] = Math.abs(quote).toString().toLowerCase().split('e');
+    const [integerPart, fractionalPart = ''] = mantissa.split('.');
+    const coefficient = BigInt(`${integerPart}${fractionalPart}`);
+    const shift = pipSize + Number(exponentText) - fractionalPart.length;
+    const scaled = shift &gt;= 0 ? coefficient * 10n ** BigInt(shift) <span class="branch-0 cbranch-no" title="branch not covered" >: (coefficient + 10n ** BigInt(-shift) / 2n) / 10n ** BigInt(-shift);</span>
+    return Number(scaled % 10n);
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-11-12T01:29:30.869Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

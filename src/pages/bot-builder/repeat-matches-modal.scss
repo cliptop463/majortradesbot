@@ -3,10 +3,12 @@
 .repeat-matches-modal__fields { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
 .repeat-matches-modal__fields label { display: grid; gap: .6rem; font-size: 1.2rem; }
 .repeat-matches-modal select, .repeat-matches-modal input { min-height: 3.6rem; padding: .6rem; }
+.repeat-matches-modal__account { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin: 1rem 0; padding: .9rem 1.2rem; border: 1px solid var(--border-normal); border-radius: .4rem; }
+.repeat-matches-modal__account strong { color: var(--text-prominent); }
 .repeat-matches-modal__status { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin: 1.8rem 0; padding: 1.2rem; background: var(--general-section-1); }
 .repeat-matches-modal__status span { display: grid; gap: .3rem; font-size: 1.1rem; }
 .repeat-matches-modal__status strong { font-size: 1.6rem; }
 .repeat-matches-modal__warning, .repeat-matches-modal__error { padding: 1rem; color: var(--status-danger); }
 .repeat-matches-modal__actions { display: flex; justify-content: flex-end; gap: .8rem; }
-.repeat-matches-modal__actions button { min-width: 9rem; min-height: 3.6rem; }
-@media (max-width: 600px) { .repeat-matches-modal__fields, .repeat-matches-modal__status { grid-template-columns: repeat(2, 1fr); } }
+.repeat-matches-modal__actions .dc-btn { min-width: 9rem; min-height: 3.6rem; }
+@media (max-width: 600px) { .repeat-matches-modal__fields, .repeat-matches-modal__status { grid-template-columns: repeat(2, 1fr); } .repeat-matches-modal__account { align-items: flex-start; flex-direction: column; } }

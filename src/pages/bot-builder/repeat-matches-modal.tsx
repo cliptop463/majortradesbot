@@ -1,6 +1,7 @@
 // @ts-nocheck — Blockly/window globals follow the other bot-builder modals
 import React from 'react';
 import Dialog from '@/components/shared_ui/dialog';
+import Button from '@/components/shared_ui/button';
 import { localize } from '@deriv-com/translations';
 import { createDerivApi, getAccountContext } from '@/utils/bulk-strategy/deriv-api';
 import { RepeatMatchesEngine, MAX_REPEAT_MATCHES_CONTRACTS } from '@/utils/repeat-matches-engine';
@@ -18,23 +19,27 @@ export default function RepeatMatchesModal({ isOpen, onClose, is_running, onRunn
     const [skipped, setSkipped] = React.useState(0);
     const [lastDigit, setLastDigit] = React.useState(null);
     const [error, setError] = React.useState('');
+    const [accountKind, setAccountKind] = React.useState(null);
     const engine = React.useRef(null);
     const mounted = React.useRef(true);
 
     React.useEffect(() => { mounted.current = true; return () => { mounted.current = false; engine.current?.stop(); }; }, []);
     React.useEffect(() => { onRunningChange?.(running); }, [running, onRunningChange]);
+    React.useEffect(() => {
+        if (isOpen) setAccountKind(getAccountContext().kind);
+    }, [isOpen]);
 
     const start = async () => {
         if (is_running || running) return;
         setError('');
         const amount = Number(stake);
         if (!Number.isFinite(amount) || amount <= 0) { setError(localize('Stake must be greater than 0.')); return; }
-        if (mode === 'live') {
-            const account = getAccountContext();
-            if (!account.kind) { setError(localize('Log in first: Live mode needs an authorized account.')); return; }
-            if (account.kind !== 'real') { setError(localize('Switch to your Real account before starting live Repeat Matches.')); return; }
-        }
         const account = getAccountContext();
+        if (mode === 'live' && !account.kind) {
+            setError(localize('Log in first: Live mode needs an authorized Demo or Real account.'));
+            return;
+        }
+        setAccountKind(account.kind);
         const instance = new RepeatMatchesEngine({ symbol, stake: amount, mode, currency: account.currency }, createDerivApi(), {
             onTick: info => { if (!mounted.current) return; setLastDigit(info.digit); setOpen(info.open); setPlaced(info.placed); setSkipped(info.skipped); },
             onError: message => mounted.current && setError(message),
@@ -53,7 +58,11 @@ export default function RepeatMatchesModal({ isOpen, onClose, is_running, onRunn
             <div className='repeat-matches-modal__fields'>
                 <label>{localize('Market')}<select value={symbol} disabled={running} onChange={e => setSymbol(e.target.value)}>{MARKETS.map(m => <option key={m} value={m}>{m}</option>)}</select></label>
                 <label>{localize('Stake')}<input type='number' min='0.35' step='0.01' value={stake} disabled={running} onChange={e => setStake(e.target.value)} /></label>
-                <label>{localize('Mode')}<select value={mode} disabled={running} onChange={e => setMode(e.target.value)}><option value='paper'>{localize('Paper')}</option><option value='live'>{localize('Live')}</option></select></label>
+                <label>{localize('Mode')}<select value={mode} disabled={running} onChange={e => setMode(e.target.value)}><option value='paper'>{localize('Paper (simulation)')}</option><option value='live'>{localize('Live (place contracts)')}</option></select></label>
+            </div>
+            <div className='repeat-matches-modal__account' data-testid='dt_repeat_matches_account'>
+                <span>{localize('Trading account')}</span>
+                <strong>{accountKind ? (accountKind === 'demo' ? localize('Demo account') : localize('Real account')) : localize('Not logged in')}</strong>
             </div>
             <div className='repeat-matches-modal__status' data-testid='dt_repeat_matches_status'>
                 <span>{localize('Last digit')}: <strong>{lastDigit ?? '—'}</strong></span>
@@ -62,11 +71,15 @@ export default function RepeatMatchesModal({ isOpen, onClose, is_running, onRunn
                 <span>{localize('Skipped at cap')}: <strong>{skipped}</strong></span>
             </div>
             {mode === 'paper' && <p className='repeat-matches-modal__hint'>{localize('Paper mode shows simulated placements and sends no buy orders. Choose Live to place real contracts.')}</p>}
-            {mode === 'live' && <p className='repeat-matches-modal__warning'>{localize('Live mode places real contracts on every tick. Losses are possible.')}</p>}
+            {mode === 'live' && <p className='repeat-matches-modal__warning'>{localize('Live mode places real contracts on every tick using the selected Demo or Real account. Losses are possible.')}</p>}
             {error && <p className='repeat-matches-modal__error' role='alert'>{error}</p>}
             <div className='repeat-matches-modal__actions'>
-                {!running ? <button type='button' onClick={start} disabled={is_running}>{localize('Start')}</button> : <button type='button' onClick={stop}>{localize('Stop')}</button>}
-                <button type='button' onClick={close} disabled={running}>{localize('Close')}</button>
+                {!running ? (
+                    <Button type='button' onClick={start} is_disabled={is_running} primary large text={localize('Start')} />
+                ) : (
+                    <Button type='button' onClick={stop} secondary large text={localize('Stop')} />
+                )}
+                <Button type='button' onClick={close} is_disabled={running} secondary large text={localize('Close')} />
             </div>
         </div>
     </Dialog>;
