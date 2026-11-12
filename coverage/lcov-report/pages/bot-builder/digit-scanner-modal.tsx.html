@@ -2467,7 +2467,7 @@
 <span class="cline-any cline-yes">148x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// @ts-nocheck â€” vendored bot code with known upstream type gaps; see AGENTS.md
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// @ts-nocheck — vendored bot code with known upstream type gaps; see AGENTS.md
 import React from 'react';
 import { ApiHelpers } from '@/external/bot-skeleton';
 import Dialog from '@/components/shared_ui/dialog';
@@ -2581,7 +2581,7 @@ const RankedRow: React.FC&lt;{
                             setExpanded(x =&gt; !x);
                         }}
                     &gt;
-                        {expanded ? 'â–¼' : 'â–¶'}
+                        {expanded ? '▼' : '▶'}
                     &lt;/button&gt;
                     #{ranked.rank} {analysis.displayName}
                     &lt;span className='digit-scanner-modal__row-symbol'&gt;{analysis.symbol}&lt;/span&gt;
@@ -2592,9 +2592,9 @@ const RankedRow: React.FC&lt;{
                 &lt;td className='digit-scanner-modal__cell'&gt;
                     {recommendation.agree}/{recommendation.eligible} agree
                 &lt;/td&gt;
-                &lt;td className='digit-scanner-modal__cell' title={localize('Heuristic score â€” not a win probability')}&gt;
+                &lt;td className='digit-scanner-modal__cell' title={localize('Heuristic score — not a win probability')}&gt;
                     {recommendation.heuristicScore.toFixed(1)}
-                    &lt;span className='digit-scanner-modal__info-icon'&gt;â„¹ï¸&lt;/span&gt;
+                    &lt;span className='digit-scanner-modal__info-icon'&gt;ℹ️&lt;/span&gt;
                 &lt;/td&gt;
                 &lt;td className='digit-scanner-modal__cell'&gt;
                     &lt;button
@@ -2659,7 +2659,7 @@ const RankedCard: React.FC&lt;{
                     aria-expanded={expanded}
                     onClick={<span class="fstat-no" title="function not covered" >() =&gt; setExpanded(x =&gt; !x)}</span>
                 &gt;
-                    {expanded <span class="branch-0 cbranch-no" title="branch not covered" >? 'â–¼' </span>: 'â–¶'}
+                    {expanded <span class="branch-0 cbranch-no" title="branch not covered" >? '▼' </span>: '▶'}
                 &lt;/button&gt;
             &lt;/header&gt;
 &nbsp;
@@ -2737,7 +2737,7 @@ const ExcludedRow: React.FC&lt;{ analysis: MarketAnalysis }&gt; = ({ analysis })
                             aria-label={expanded <span class="branch-0 cbranch-no" title="branch not covered" >? localize('Collapse') </span>: localize('Expand')}
                             onClick={<span class="fstat-no" title="function not covered" >() =&gt; setExpanded(x =&gt; !x)}</span>
                         &gt;
-                            {expanded <span class="branch-0 cbranch-no" title="branch not covered" >? 'â–¼' </span>: 'â–¶'}
+                            {expanded <span class="branch-0 cbranch-no" title="branch not covered" >? '▼' </span>: '▶'}
                         &lt;/button&gt;
                     )}
                     {analysis.displayName}
@@ -2798,7 +2798,7 @@ const ManualResult: React.FC&lt;{
             {rec ? (
                 &lt;&gt;
                     &lt;p className='digit-scanner-modal__selected' data-testid='dt_digit_scanner_manual_pick'&gt;
-                        {`${formatPick(rec.direction, rec.digit)} Â· ${rec.agree}/${rec.eligible} ${localize('agree')} Â· ${localize(
+                        {`${formatPick(rec.direction, rec.digit)} · ${rec.agree}/${rec.eligible} ${localize('agree')} · ${localize(
                             'Heuristic score (not a win probability)'
                         )} ${rec.heuristicScore.toFixed(1)}`}
                     &lt;/p&gt;
@@ -3151,7 +3151,7 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                 is_visible={isOpen &amp;&amp; !confirm_state}
                 cancel_button_text={localize('Close')}
                 onCancel={handleClose}
-                confirm_button_text={scan_status === 'scanning' ? localize('Scanningâ€¦') : localize('Scan')}
+                confirm_button_text={scan_status === 'scanning' ? localize('Scanning…') : localize('Scan')}
                 onConfirm={handleScan}
                 is_confirm_disabled={scan_status === 'scanning'}
                 is_mobile_full_width={false}
@@ -3187,7 +3187,7 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                                     {localize('Volatility index')}
                                 &lt;/label&gt;
                                 {market_options_status === 'loading' &amp;&amp; (
-                                    &lt;p className='digit-scanner-modal__hint'&gt;{localize('Loading marketsâ€¦')}&lt;/p&gt;
+                                    &lt;p className='digit-scanner-modal__hint'&gt;{localize('Loading markets…')}&lt;/p&gt;
                                 )}
                                 {market_options_status === 'error' &amp;&amp; (
                                     &lt;p className='digit-scanner-modal__message digit-scanner-modal__message--error' data-testid='dt_digit_scanner_market_error'&gt;
@@ -3324,7 +3324,7 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                                                 onClick={() =&gt; toggleStrategy(info.id)}
                                             &gt;
                                                 {info.name}
-                                                {info.experimental ? ` Â· ${localize('experimental')}` : ''}
+                                                {info.experimental ? ` · ${localize('experimental')}` : ''}
                                             &lt;/button&gt;
                                         );
                                     })}
@@ -3380,8 +3380,8 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
 &nbsp;
                     {scan_status === 'scanning' &amp;&amp; (
                         &lt;div className='digit-scanner-modal__scanning' data-testid='dt_digit_scanner_scanning'&gt;
-                            &lt;span className='digit-scanner-spinner' aria-label={localize('Scanningâ€¦')} /&gt;
-                            {localize('Scanning volatility marketsâ€¦')}
+                            &lt;span className='digit-scanner-spinner' aria-label={localize('Scanning…')} /&gt;
+                            {localize('Scanning volatility markets…')}
                         &lt;/div&gt;
                     )}
 &nbsp;
@@ -3429,7 +3429,7 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                             {!is_manual &amp;&amp; ranking.selected &amp;&amp; (
                                 &lt;&gt;
                                     &lt;p className='digit-scanner-modal__selected' data-testid='dt_digit_scanner_selected'&gt;
-                                        {`${localize('Selected')}: ${ranking.selected.analysis.symbol} Â· ${formatPick(
+                                        {`${localize('Selected')}: ${ranking.selected.analysis.symbol} · ${formatPick(
                                             ranking.selected.recommendation.direction,
                                             ranking.selected.recommendation.digit
                                         )}`}
@@ -3518,7 +3518,7 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                                 disabled={is_validating}
                                 onClick={handleValidate}
                             &gt;
-                                {is_validating ? localize('Validatingâ€¦') : localize('Validate on these ticks')}
+                                {is_validating ? localize('Validating…') : localize('Validate on these ticks')}
                             &lt;/button&gt;
                             {validation &amp;&amp; validation.signals === 0<span class="branch-0 cbranch-no" title="branch not covered" > &amp;&amp; validation.markets &gt; 0<span class="branch-0 cbranch-no" title="branch not covered" > </span>&amp;&amp; (</span>
 <span class="cstat-no" title="statement not covered" >                                &lt;p className='digit-scanner-modal__hint' data-testid='dt_digit_scanner_validation_strategy'&gt;</span>
@@ -3553,7 +3553,7 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                                         if (studyVerdict(study) === 'insufficient_data') {
                                             return localize('Not enough rising-share events to test that idea yet. Scan again with more ticks.');
                                         }
-                                        const rate = (a: number, n: number) =&gt; (n ? ((100 * a) / n).toFixed(1) <span class="branch-0 cbranch-no" title="branch not covered" >: 'â€“')</span>;
+                                        const rate = (a: number, n: number) =&gt; (n ? ((100 * a) / n).toFixed(1) <span class="branch-0 cbranch-no" title="branch not covered" >: '–')</span>;
                                         const z = zForRate(study.rising.appeared, study.rising.n, study.baselineAppear);
                                         const verdict =
                                             z &gt;= 2
@@ -3599,7 +3599,7 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                     )}
                     {confirm_state &amp;&amp; (
                         &lt;p className='digit-scanner-confirm-modal__summary'&gt;
-                            {`${confirm_state.displayName ? `${confirm_state.displayName} (${confirm_state.pick.symbol})` <span class="branch-0 cbranch-no" title="branch not covered" >: confirm_state.pick.symbol}</span> Â· ${formatPick(
+                            {`${confirm_state.displayName ? `${confirm_state.displayName} (${confirm_state.pick.symbol})` <span class="branch-0 cbranch-no" title="branch not covered" >: confirm_state.pick.symbol}</span> · ${formatPick(
                                 confirm_state.pick.direction,
                                 confirm_state.pick.digit
                             )}`}
@@ -3617,14 +3617,14 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                             &lt;tbody&gt;
                                 &lt;tr&gt;
                                     &lt;td&gt;{localize('Symbol')}&lt;/td&gt;
-                                    &lt;td className='digit-scanner-confirm-modal__before'&gt;{preview.symbol.before ?? 'â€”'}&lt;/td&gt;
+                                    &lt;td className='digit-scanner-confirm-modal__before'&gt;{preview.symbol.before ?? '—'}&lt;/td&gt;
                                     &lt;td className='digit-scanner-confirm-modal__after'&gt;{preview.symbol.after}&lt;/td&gt;
                                 &lt;/tr&gt;
                                 {preview.category &amp;&amp; (
                                     &lt;tr&gt;
                                         &lt;td&gt;{localize('Trade type category')}&lt;/td&gt;
                                         &lt;td className='digit-scanner-confirm-modal__before'&gt;
-                                            {preview.category.before<span class="branch-0 cbranch-no" title="branch not covered" > ?? 'â€”'}</span>
+                                            {preview.category.before<span class="branch-0 cbranch-no" title="branch not covered" > ?? '—'}</span>
                                         &lt;/td&gt;
                                         &lt;td className='digit-scanner-confirm-modal__after'&gt;{preview.category.after}&lt;/td&gt;
                                     &lt;/tr&gt;
@@ -3633,22 +3633,22 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                                     &lt;tr&gt;
                                         &lt;td&gt;{localize('Trade type')}&lt;/td&gt;
                                         &lt;td className='digit-scanner-confirm-modal__before'&gt;
-                                            {preview.tradeType.before<span class="branch-0 cbranch-no" title="branch not covered" > ?? 'â€”'}</span>
+                                            {preview.tradeType.before<span class="branch-0 cbranch-no" title="branch not covered" > ?? '—'}</span>
                                         &lt;/td&gt;
                                         &lt;td className='digit-scanner-confirm-modal__after'&gt;{preview.tradeType.after}&lt;/td&gt;
                                     &lt;/tr&gt;
                                 )}
                                 &lt;tr&gt;
                                     &lt;td&gt;{localize('Contract type')}&lt;/td&gt;
-                                    &lt;td className='digit-scanner-confirm-modal__before'&gt;{preview.type.before ?? 'â€”'}&lt;/td&gt;
+                                    &lt;td className='digit-scanner-confirm-modal__before'&gt;{preview.type.before ?? '—'}&lt;/td&gt;
                                     &lt;td className='digit-scanner-confirm-modal__after'&gt;{preview.type.after}&lt;/td&gt;
                                 &lt;/tr&gt;
                                 &lt;tr&gt;
                                     &lt;td&gt;{localize('Prediction digit')}&lt;/td&gt;
                                     &lt;td className='digit-scanner-confirm-modal__before'&gt;
-                                        {preview.prediction ? preview.prediction.before ?? '-' <span class="branch-0 cbranch-no" title="branch not covered" >: '-'}</span>
+                                        {preview.prediction ? preview.prediction.before ?? '?' <span class="branch-0 cbranch-no" title="branch not covered" >: '?'}</span>
                                     &lt;/td&gt;
-                                    &lt;td className='digit-scanner-confirm-modal__after'&gt;{preview.prediction ? preview.prediction.after <span class="branch-0 cbranch-no" title="branch not covered" >: '-'}</span>&lt;/td&gt;
+                                    &lt;td className='digit-scanner-confirm-modal__after'&gt;{preview.prediction ? preview.prediction.after <span class="branch-0 cbranch-no" title="branch not covered" >: '?'}</span>&lt;/td&gt;
                                 &lt;/tr&gt;
                             &lt;/tbody&gt;
                         &lt;/table&gt;
@@ -3661,7 +3661,7 @@ const DigitScannerModal: React.FC&lt;Props&gt; = ({ isOpen, onClose, onApplied, 
                             {localize('Cannot apply while the bot is running.')}
                         &lt;/p&gt;
                     )}
-                    {is_applying &amp;&amp; &lt;p className='digit-scanner-modal__message'&gt;{localize('Applyingâ€¦')}&lt;/p&gt;}
+                    {is_applying &amp;&amp; &lt;p className='digit-scanner-modal__message'&gt;{localize('Applying…')}&lt;/p&gt;}
                 &lt;/div&gt;
             &lt;/Dialog&gt;
         &lt;/&gt;
@@ -3676,7 +3676,7 @@ export default DigitScannerModal;
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-11-12T01:07:26.720Z
+                at 2026-11-12T01:22:28.766Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

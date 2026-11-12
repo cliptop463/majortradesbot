@@ -1177,7 +1177,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                 <tr>
                                     <td>{localize('Prediction digit')}</td>
                                     <td className='digit-scanner-confirm-modal__before'>
-                                        {preview.prediction.before ?? '—'}
+                                        {preview.prediction ? preview.prediction.before ?? '\u2014' : '\u2014'}
                                     </td>
                                     <td className='digit-scanner-confirm-modal__after'>{preview.prediction ? preview.prediction.after : '?'}</td>
                                 </tr>
