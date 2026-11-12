@@ -1179,7 +1179,7 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                                     <td className='digit-scanner-confirm-modal__before'>
                                         {preview.prediction.before ?? '—'}
                                     </td>
-                                    <td className='digit-scanner-confirm-modal__after'>{preview.prediction.after}</td>
+                                    <td className='digit-scanner-confirm-modal__after'>{preview.prediction ? preview.prediction.after : '?'}</td>
                                 </tr>
                             </tbody>
                         </table>

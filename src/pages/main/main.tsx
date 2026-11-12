@@ -178,7 +178,7 @@ const AppWrapper = observer(() => {
     });
 
     React.useEffect(() => {
-        if (connectionStatus !== CONNECTION_STATUS.OPENED) {
+        if (connectionStatus === CONNECTION_STATUS.CLOSED) {
             const is_bot_running = document.getElementById('db-animation__stop-button') !== null;
             if (is_bot_running) {
                 clear();
