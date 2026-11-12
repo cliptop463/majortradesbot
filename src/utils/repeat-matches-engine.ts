@@ -46,15 +46,17 @@ export class RepeatMatchesEngine {
         if (!this.config.symbol) throw new Error('Choose a market.');
         if (!Number.isFinite(this.config.stake) || this.config.stake <= 0) throw new Error('Stake must be greater than 0.');
         this.running = true;
-        this.offMessage = this.api.onMessage(data => this.onMessage(data));
-        const response = await this.api.send({ ticks_history: this.config.symbol, adjust_start_time: 1, count: 1, end: 'latest', style: 'ticks', subscribe: 1 });
-        if (response?.error) {
+        try {
+            this.offMessage = this.api.onMessage(data => this.onMessage(data));
+            const response = await this.api.send({ ticks_history: this.config.symbol, adjust_start_time: 1, count: 1, end: 'latest', style: 'ticks', subscribe: 1 });
+            if (response?.error) throw new Error(response.error.message || 'Could not subscribe to ticks.');
+            const pipSize = Number(response?.history?.pip_size ?? response?.pip_size);
+            this.pipSize = Number.isInteger(pipSize) && pipSize >= 0 && pipSize <= 12 ? pipSize : null;
+            this.tickSubscription = response?.subscription?.id ?? null;
+        } catch (error) {
             await this.stop();
-            throw new Error(response.error.message || 'Could not subscribe to ticks.');
+            throw error;
         }
-        const pipSize = Number(response?.history?.pip_size ?? response?.pip_size);
-        this.pipSize = Number.isInteger(pipSize) && pipSize >= 0 && pipSize <= 12 ? pipSize : null;
-        this.tickSubscription = response?.subscription?.id ?? null;
     }
 
     async stop() {

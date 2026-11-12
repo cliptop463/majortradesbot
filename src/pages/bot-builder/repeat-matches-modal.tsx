@@ -32,8 +32,10 @@ export default function RepeatMatchesModal({ isOpen, onClose, is_running, onRunn
         if (mode === 'live') {
             const account = getAccountContext();
             if (!account.kind) { setError(localize('Log in first: Live mode needs an authorized account.')); return; }
+            if (account.kind !== 'real') { setError(localize('Switch to your Real account before starting live Repeat Matches.')); return; }
         }
-        const instance = new RepeatMatchesEngine({ symbol, stake: amount, mode, currency: getAccountContext().currency }, createDerivApi(), {
+        const account = getAccountContext();
+        const instance = new RepeatMatchesEngine({ symbol, stake: amount, mode, currency: account.currency }, createDerivApi(), {
             onTick: info => { if (!mounted.current) return; setLastDigit(info.digit); setOpen(info.open); setPlaced(info.placed); setSkipped(info.skipped); },
             onError: message => mounted.current && setError(message),
             onStop: () => mounted.current && setRunning(false),
