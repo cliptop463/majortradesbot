@@ -146,6 +146,11 @@ const AppWrapper = observer(() => {
         const el_dashboard = document.getElementById('id-dbot-dashboard');
         const el_tutorial = document.getElementById('id-tutorials');
 
+        // These sections are conditionally rendered while switching tabs and while
+        // the bot is stopping. Do not let a transiently missing element crash the
+        // whole app through the global error boundary.
+        if (!el_dashboard || !el_tutorial || !window.IntersectionObserver) return;
+
         const observer_dashboard = new window.IntersectionObserver(
             ([entry]) => {
                 if (entry.isIntersecting) {
@@ -175,7 +180,12 @@ const AppWrapper = observer(() => {
         );
         observer_dashboard.observe(el_dashboard);
         observer_tutorial.observe(el_tutorial);
-    });
+
+        return () => {
+            observer_dashboard.disconnect();
+            observer_tutorial.disconnect();
+        };
+    }, [active_tab]);
 
     React.useEffect(() => {
         if (connectionStatus === CONNECTION_STATUS.CLOSED) {
