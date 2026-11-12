@@ -13,6 +13,7 @@ import type { MatchesDiffersAnalysis } from '@/utils/digit-scanner/matches-diffe
 import { loadSample } from '@/utils/digit-scanner/matches-differs-load';
 import type { LoadedSample } from '@/utils/digit-scanner/matches-differs-load';
 import { applyScannerPick, getSelectedSymbol, previewScannerPick } from '@/utils/blockly-scanner-pick';
+import { auditSequence } from '@/utils/digit-scanner/sequence-audit';
 import type { ScannerPickPreview } from '@/utils/blockly-scanner-pick';
 import './matches-differs-modal.scss';
 
@@ -178,6 +179,7 @@ const MatchesDiffersModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_r
     };
 
     const is_confirming = !!pending;
+    const audit = React.useMemo(() => (sample ? auditSequence(sample.digits, { side: 'digit' }) : null), [sample]);
     const category_before = pending?.preview.category?.before;
     const is_not_digits = is_confirming && category_before && String(category_before).trim() !== 'digits';
 
@@ -293,6 +295,33 @@ const MatchesDiffersModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_r
                         </p>
 
                         <DigitChart result={result} />
+
+                        {audit && (
+                            <section className='matches-differs-modal__audit' data-testid='dt_matches_differs_audit'>
+                                <h3>{localize('Sequence audit')}</h3>
+                                <p>
+                                    {localize('Latest digit')}: <strong>{audit.lastDigit ?? '?'}</strong> ? {localize('same-digit streak')}:{' '}
+                                    <strong>{audit.currentStreak}</strong>
+                                </p>
+                                <p>
+                                    {localize('Recent leader')} ({audit.recentWindow}): <strong>{audit.recentLeader ?? '?'}</strong>{' '}
+                                    {audit.recentLeaderShare === null ? '' : `${(audit.recentLeaderShare * 100).toFixed(1)}%`} ?{' '}
+                                    {localize('previous window')}: <strong>{audit.previousLeader ?? '?'}</strong>
+                                </p>
+                                <p>
+                                    {audit.transitionLeader === null
+                                        ? localize('Not enough transition history for the latest digit.')
+                                        : localize('After the latest digit, {{digit}} followed {{count}} of {{sample}} observed times.', {
+                                              digit: audit.transitionLeader,
+                                              count: audit.transitionCount,
+                                              sample: audit.transitionSample,
+                                          })}
+                                </p>
+                                <p className={audit.reversalSignal ? 'matches-differs-modal__audit-warning' : ''}>
+                                    {audit.reversalNote}
+                                </p>
+                            </section>
+                        )}
 
                         <div className='matches-differs-modal__actions'>
                             <button

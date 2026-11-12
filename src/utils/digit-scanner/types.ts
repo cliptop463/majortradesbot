@@ -1,4 +1,5 @@
 import type { ActiveSymbols } from '@deriv/api-types';
+import type { SequenceAudit } from './sequence-audit';
 
 export type ActiveSymbol = ActiveSymbols[number] & {
     symbol?: string;
@@ -57,6 +58,7 @@ export interface MarketAnalysis {
     message?: string;
     strategies: StrategyResult[];
     recommendation: Recommendation | null;
+    audit?: SequenceAudit;
 }
 
 export interface RankedMarket {

@@ -733,3 +733,6 @@
     gap: 0.8rem;
     margin-bottom: 0.6rem;
 }
+
+.digit-scanner-modal__audit { display: grid; gap: .35rem; margin-top: .8rem; padding: .8rem 1rem; border: 1px solid var(--border-normal); border-radius: .4rem; font-size: 1.1rem; line-height: 1.35; }
+.digit-scanner-modal__audit-warning { color: var(--status-warning); }

@@ -226,3 +226,8 @@
         transform: rotate(360deg);
     }
 }
+
+.matches-differs-modal__audit { margin: 1.2rem 0; padding: 1.2rem; border: 1px solid var(--border-normal); border-radius: .4rem; background: var(--general-section-1); }
+.matches-differs-modal__audit h3 { margin: 0 0 .8rem; font-size: 1.3rem; }
+.matches-differs-modal__audit p { margin: .45rem 0; line-height: 1.4; }
+.matches-differs-modal__audit-warning { color: var(--status-warning); }

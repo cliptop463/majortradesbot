@@ -3,6 +3,8 @@ import type { ActiveSymbol } from './types';
 import { checkPrecision, extractLastDigits, pipDecimals } from './digits';
 import { analyzeDigits } from './ensemble';
 import type { EnsembleResult, MarketAnalysis } from './types';
+import { auditSequence } from './sequence-audit';
+import type { AuditSide } from './sequence-audit';
 
 export const SCAN_DEFAULTS = {
     count: 500,
@@ -34,6 +36,7 @@ export interface ScanMarketsOptions {
      * Even/Odd or Over/Under. Data-quality checks (precision, minimum ticks) still run first.
      */
     analyze?: (digits: readonly number[]) => EnsembleResult;
+    audit?: { side: AuditSide; threshold?: number };
     /** Called with each market's valid digits once they pass the data-quality checks (used for validation). */
     onDigits?: (symbol: string, digits: readonly number[]) => void;
 }
@@ -265,6 +268,7 @@ export async function scanMarkets(
                 message: ensemble.reason ?? 'Consensus not reached',
                 strategies: ensemble.strategies,
                 recommendation: null,
+                audit: options?.audit ? auditSequence(digits, options.audit) : undefined,
             };
         }
 
@@ -279,6 +283,7 @@ export async function scanMarkets(
             status: 'ok',
             strategies: ensemble.strategies,
             recommendation: ensemble.recommendation,
+            audit: options?.audit ? auditSequence(digits, options.audit) : undefined,
         };
     }
 

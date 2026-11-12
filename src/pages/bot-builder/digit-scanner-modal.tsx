@@ -77,6 +77,20 @@ const StatusBadge: React.FC<{ status: MarketAnalysis['status'] | 'skipped' }> = 
     );
 };
 
+const AuditSummary: React.FC<{ audit?: MarketAnalysis['audit'] }> = ({ audit }) => {
+    if (!audit) return null;
+    return (
+        <div className='digit-scanner-modal__audit' data-testid='dt_digit_scanner_sequence_audit'>
+            <strong>{localize('Sequence audit')}</strong>
+            <span>{localize('Current')}: {audit.currentValue} ? {localize('streak')}: {audit.currentStreak}</span>
+            <span>{localize('Recent leader')}: {audit.recentLeader ?? '?'} ({audit.recentLeaderShare === null ? '?' : `${(audit.recentLeaderShare * 100).toFixed(1)}%`})</span>
+            <span>{localize('Previous leader')}: {audit.previousLeader ?? '?'}</span>
+            <span>{audit.transitionLeader === null ? localize('No transition sample for the latest digit.') : localize('After the latest digit, {{digit}} followed {{count}}/{{sample}} times.', { digit: audit.transitionLeader, count: audit.transitionCount, sample: audit.transitionSample })}</span>
+            {audit.reversalSignal && <span className='digit-scanner-modal__audit-warning'>{audit.reversalNote}</span>}
+        </div>
+    );
+};
+
 const StrategyRow: React.FC<{ s: StrategyResult }> = ({ s }) => (
     <tr className='digit-scanner-modal__strategy-table-row'>
         <td>{s.name}</td>
@@ -158,6 +172,7 @@ const RankedRow: React.FC<{
                                     <StrategyRow key={s.id} s={s} />
                                 ))}
                             </tbody>
+                            <tfoot><tr><td colSpan={3}><AuditSummary audit={analysis.audit} /></td></tr></tfoot>
                         </table>
                     </td>
                 </tr>
@@ -237,6 +252,7 @@ const RankedCard: React.FC<{
                             </div>
                         </div>
                     ))}
+                    <AuditSummary audit={analysis.audit} />
                 </div>
             )}
 
@@ -610,6 +626,9 @@ const DigitScannerModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_run
                 timeout: 10000,
                 onDigits: (symbol: string, digits: readonly number[]) => {
                     scanned_digits.current.set(symbol, digits);
+                },
+                audit: {
+                    side: trade_kind === 'even_odd' ? 'even_odd' : trade_kind === 'over_under' ? 'over_under' : 'digit',
                 },
                 ...(active_engine === 'pattern' ? { analyze: buildAnalyzer() } : {}),
             });
