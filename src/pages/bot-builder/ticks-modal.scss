@@ -1,0 +1,14 @@
+.ticks-modal__content { min-width: min(760px, 90vw); max-height: 75vh; overflow-y: auto; color: var(--text-general); }
+.ticks-modal__intro, .ticks-modal__hint, .ticks-modal__disclaimer { margin: 0 0 12px; font-size: 13px; }
+.ticks-modal__controls { display: flex; gap: 16px; margin-bottom: 14px; }
+.ticks-modal__controls label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.ticks-modal__controls input { width: 110px; padding: 6px; }
+.ticks-modal__controls small, .ticks-modal__table small { display: block; font-size: 11px; opacity: .7; }
+.ticks-modal__strategies { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin-bottom: 14px; }
+.ticks-modal__strategies strong { grid-column: 1 / -1; }
+.ticks-modal__scan, .ticks-modal__table button { padding: 8px 12px; cursor: pointer; }
+.ticks-modal__table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.ticks-modal__table th, .ticks-modal__table td { padding: 8px; border-bottom: 1px solid var(--border-normal); text-align: left; }
+.ticks-modal__error { color: var(--status-danger); }
+.ticks-modal__disclaimer { margin-top: 16px; opacity: .7; }
+@media (max-width: 600px) { .ticks-modal__content { min-width: 0; } .ticks-modal__strategies { grid-template-columns: 1fr; } }

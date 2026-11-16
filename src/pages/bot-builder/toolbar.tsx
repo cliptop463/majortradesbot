@@ -16,6 +16,7 @@ import DigitScannerModal from './digit-scanner-modal';
 import MatchesDiffersModal from './matches-differs-modal';
 import BulkStrategyModal from './bulk-strategy-modal';
 import RepeatMatchesModal from './repeat-matches-modal';
+import TicksModal from './ticks-modal';
 
 // Load the existing toolbar styles
 import './toolbar/toolbar.scss';
@@ -53,6 +54,7 @@ const Toolbar = observer(() => {
     const [is_bulk_running, setIsBulkRunning] = React.useState(false);
     const [is_repeat_matches_open, setIsRepeatMatchesOpen] = React.useState(false);
     const [is_repeat_matches_running, setIsRepeatMatchesRunning] = React.useState(false);
+    const [is_ticks_open, setIsTicksOpen] = React.useState(false);
 
     // Open Quick Strategy
     const handleQuickStrategyOpen = () => {
@@ -117,6 +119,15 @@ const Toolbar = observer(() => {
                         button_classname='toolbar__btn toolbar__btn--icon toolbar__btn--digit-scanner'
                         buttonOnClick={handleDigitScannerOpen}
                         button_text={localize('Digit Scanner')}
+                        is_bot_running={is_running}
+                    />
+
+                    <ToolbarButton
+                        popover_message={localize('Use the Digit Scanner strategies to analyse High/Low Tick contracts.')}
+                        button_id='db-toolbar__ticks-scanner-button'
+                        button_classname='toolbar__btn toolbar__btn--icon toolbar__btn--digit-scanner'
+                        buttonOnClick={() => setIsTicksOpen(true)}
+                        button_text={localize('High/Low Ticks')}
                         is_bot_running={is_running}
                     />
 
@@ -220,6 +231,12 @@ const Toolbar = observer(() => {
                 onClose={() => setIsRepeatMatchesOpen(false)}
                 is_running={is_running}
                 onRunningChange={setIsRepeatMatchesRunning}
+            />
+            <TicksModal
+                isOpen={is_ticks_open}
+                onClose={() => setIsTicksOpen(false)}
+                onApplied={() => { setIsTicksOpen(false); setActiveTab(DBOT_TABS.BOT_BUILDER); }}
+                is_running={is_running}
             />
         </React.Fragment>
     );
