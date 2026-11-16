@@ -22,3 +22,9 @@
 .ticks-modal__table tbody tr { cursor: pointer; }
 .ticks-modal__table tbody tr:hover, .ticks-modal__table .ticks-modal__row--selected { background: var(--state-hover, #f0f3f5); }
 @media (max-width: 600px) { .ticks-modal__selection { align-items: stretch; flex-direction: column; gap: 10px; } }
+.ticks-modal__scan { border: 0; border-radius: 6px; background: var(--brand-red-coral, #ff444f); color: #fff; font-weight: 700; }
+.ticks-modal__scan:hover:not(:disabled), .ticks-modal__apply:hover:not(:disabled) { filter: brightness(.92); }
+.ticks-modal__scan:disabled { cursor: not-allowed; opacity: .55; }
+.ticks-modal__table button { border: 1px solid var(--border-normal, #d6d6d6); border-radius: 5px; background: var(--general-main-1, #fff); color: var(--text-general, #222); font-weight: 600; }
+.ticks-modal__table button:hover:not(:disabled) { border-color: var(--brand-red-coral, #ff444f); color: var(--brand-red-coral, #ff444f); }
+.ticks-modal__table button:disabled { cursor: not-allowed; opacity: .5; }
