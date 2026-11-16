@@ -12,3 +12,13 @@
 .ticks-modal__error { color: var(--status-danger); }
 .ticks-modal__disclaimer { margin-top: 16px; opacity: .7; }
 @media (max-width: 600px) { .ticks-modal__content { min-width: 0; } .ticks-modal__strategies { grid-template-columns: 1fr; } }
+.ticks-modal__selection { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding: 12px; border: 1px solid var(--brand-red-coral, #ff444f); border-radius: 8px; background: var(--general-section-1, #f7f7f7); }
+.ticks-modal__selection > div:first-child { display: flex; flex: 1; flex-direction: column; gap: 3px; }
+.ticks-modal__selection-label { font-size: 11px; text-transform: uppercase; opacity: .7; }
+.ticks-modal__selection-pick { font-weight: 700; color: var(--brand-red-coral, #d9363e); white-space: nowrap; }
+.ticks-modal__selection-pick span { display: block; font-size: 11px; font-weight: 400; color: inherit; }
+.ticks-modal__apply { padding: 9px 14px; border: 0; border-radius: 6px; background: var(--brand-red-coral, #ff444f); color: #fff; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.ticks-modal__apply:disabled { opacity: .55; cursor: not-allowed; }
+.ticks-modal__table tbody tr { cursor: pointer; }
+.ticks-modal__table tbody tr:hover, .ticks-modal__table .ticks-modal__row--selected { background: var(--state-hover, #f0f3f5); }
+@media (max-width: 600px) { .ticks-modal__selection { align-items: stretch; flex-direction: column; gap: 10px; } }

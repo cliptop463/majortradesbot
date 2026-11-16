@@ -26,12 +26,13 @@ const TicksModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_running })
     const [selectedTick, setSelectedTick] = React.useState('5');
     const [error, setError] = React.useState('');
     const [applying, setApplying] = React.useState(false);
+    const [selected, setSelected] = React.useState<MarketAnalysis | null>(null);
 
     const scan = async () => {
         const minimum = Number.parseInt(minTicks, 10);
         if (!Number.isInteger(minimum) || minimum < 50 || minimum > 5000) { setError(localize('Minimum ticks must be between 50 and 5000.')); return; }
         if (!strategies.length) { setError(localize('Select at least one strategy.')); return; }
-        setScanning(true); setError(''); setResults([]);
+        setScanning(true); setError(''); setResults([]); setSelected(null);
         try {
             const active = ApiHelpers?.instance?.active_symbols;
             if (!active?.retrieveActiveSymbols) throw new Error(localize('Connection error: active symbols are unavailable.'));
@@ -47,21 +48,27 @@ const TicksModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_running })
         finally { setScanning(false); }
     };
 
-    const select = async (analysis: MarketAnalysis) => {
+    const select = (analysis: MarketAnalysis) => {
+        setError('');
+        setSelected(analysis);
+    };
+
+    const apply = async () => {
+        if (!selected) return;
         const tick = Number.parseInt(selectedTick, 10);
-        const pick = toPick(analysis, tick);
+        const pick = toPick(selected, tick);
         if (!pick) { setError(localize('No Over/Under consensus was found for this market.')); return; }
         const preview = previewTickPick(window?.Blockly?.derivWorkspace, pick);
-        if (!preview.ok) { setError(preview.reason); return; }
+        if (!preview.ok) { setError((preview as any).reason); return; }
         setApplying(true);
         const result = await applyTickPick(window?.Blockly?.derivWorkspace, pick);
         setApplying(false);
-        if (!result.ok) { setError(result.reason); return; }
+        if (!result.ok) { setError((result as any).reason); return; }
         onApplied();
     };
 
-    const close = () => { setError(''); setResults([]); onClose(); };
-    return <Dialog portal_element_id='modal_root' title={localize('High/Low Ticks Scanner')} is_visible={isOpen} onCancel={close} has_close_icon cancel_button_text={localize('Close')} className='ticks-modal'>
+    const close = () => { setError(''); setResults([]); setSelected(null); onClose(); };
+    return <Dialog portal_element_id='modal_root' title={localize('High/Low Ticks Scanner')} is_visible={isOpen} onCancel={close} onConfirm={() => undefined} login={() => undefined} has_close_icon cancel_button_text={localize('Close')} className='ticks-modal'>
         <div className='ticks-modal__content' data-testid='dt_ticks_scanner_modal'>
             <p className='ticks-modal__intro'>{localize('Runs the Digit Scanner Over/Under strategies and converts the consensus into a High Tick or Low Tick contract.')}</p>
             <div className='ticks-modal__controls'>
@@ -71,7 +78,8 @@ const TicksModal: React.FC<Props> = ({ isOpen, onClose, onApplied, is_running })
             <div className='ticks-modal__strategies'><strong>{localize('Strategies')}</strong>{PATTERN_STRATEGY_INFO.map(s => <label key={s.id}><input type='checkbox' checked={strategies.includes(s.id)} onChange={() => setStrategies(x => x.includes(s.id) ? x.filter(id => id !== s.id) : [...x, s.id])} />{s.name}</label>)}</div>
             <button type='button' className='ticks-modal__scan' onClick={scan} disabled={scanning || is_running}>{scanning ? localize('Scanning…') : localize('Scan for High/Low Ticks')}</button>
             {error && <p className='ticks-modal__error'>{error}</p>}
-            {results.length > 0 && <table className='ticks-modal__table'><thead><tr><th>{localize('Market')}</th><th>{localize('Recommendation')}</th><th>{localize('Agreement')}</th><th /></tr></thead><tbody>{results.map(a => <tr key={a.symbol}><td>{a.displayName}<small>{a.symbol}</small></td><td>{a.recommendation ? (a.recommendation.direction === 'OVER' ? 'High Tick' : a.recommendation.direction === 'UNDER' ? 'Low Tick' : 'No signal') : 'No signal'}</td><td>{a.recommendation ? `${a.recommendation.agree}/${a.recommendation.eligible}` : '—'}</td><td><button type='button' onClick={() => select(a)} disabled={!a.recommendation || applying}>{localize('Use')}</button></td></tr>)}</tbody></table>}
+            {selected?.recommendation && <section className='ticks-modal__selection' data-testid='dt_ticks_scanner_selection'><div><span className='ticks-modal__selection-label'>{localize('Selected analysis')}</span><strong>{selected.displayName}</strong><small>{selected.symbol}</small></div><div className='ticks-modal__selection-pick'>{selected.recommendation.direction === 'OVER' ? localize('High Tick') : localize('Low Tick')} <span>{localize('selected tick')} {selectedTick}</span></div><button type='button' className='ticks-modal__apply' onClick={apply} disabled={applying || is_running}>{applying ? localize('Applying…') : localize('Apply to bot')}</button></section>}
+            {results.length > 0 && <table className='ticks-modal__table'><thead><tr><th>{localize('Market')}</th><th>{localize('Recommendation')}</th><th>{localize('Agreement')}</th><th /></tr></thead><tbody>{results.map(a => <tr key={a.symbol} className={selected?.symbol === a.symbol ? 'ticks-modal__row--selected' : ''} onClick={() => a.recommendation && select(a)}><td>{a.displayName}<small>{a.symbol}</small></td><td>{a.recommendation ? (a.recommendation.direction === 'OVER' ? localize('High Tick') : a.recommendation.direction === 'UNDER' ? localize('Low Tick') : localize('No signal')) : localize('No signal')}</td><td>{a.recommendation ? `${a.recommendation.agree}/${a.recommendation.eligible}` : '—'}</td><td><button type='button' onClick={e => { e.stopPropagation(); if (a.recommendation) select(a); }} disabled={!a.recommendation || applying}>{selected?.symbol === a.symbol ? localize('Selected') : localize('Select')}</button></td></tr>)}</tbody></table>}
             {!scanning && !results.length && <p className='ticks-modal__hint'>{localize('Choose your strategies and selected tick, then scan recent volatility-index ticks.')}</p>}
             <p className='ticks-modal__disclaimer'>{localize('These are historical heuristics, not a prediction or guarantee of profit.')}</p>
         </div>
