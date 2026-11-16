@@ -67,6 +67,8 @@ export interface SignalResult {
     reason: string;
     /** Optional structured diagnostics for strategies that expose their model state. */
     diagnostics?: SignalDiagnostics;
+    /** Optional contract selected by a directional signal. */
+    contract?: ContractSpec;
     /** Entries forced by an explicitly enabled test timeout are not model signals. */
     testingOnly?: boolean;
 }

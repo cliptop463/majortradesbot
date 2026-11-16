@@ -249,7 +249,7 @@ describe('Real account confirmation', () => {
         fireEvent.click(screen.getByTestId('dt_bulk_account_real'));
         expect(screen.getByTestId('dt_bulk_real_confirm')).toBeTruthy();
         expect(screen.getByTestId('dt_bulk_account_demo').getAttribute('aria-pressed')).toBe('true');
-        expect(screen.getByTestId('dt_bulk_real_enable').disabled).toBe(true);
+        expect(screen.getByTestId('dt_bulk_real_enable').disabled).toBe(false);
 
         fireEvent.click(screen.getByTestId('dt_bulk_real_ack'));
         fireEvent.click(screen.getByTestId('dt_bulk_real_enable'));

@@ -609,7 +609,7 @@ export class BulkEngine {
         const roundNumber = this.stats.rounds + 1;
         const intents = this.strategy.createTradeIntents?.(this.marketTicks, this.config);
         if (intents && intents.length === 0) return;
-        const spec = intents ? null : this.strategy.contract(this.config);
+        const spec = intents ? null : signal.contract ?? this.strategy.contract(this.config);
         const result = intents
             ? this.config.mode === 'live'
                 ? await this.playIntentLive(stake, intents)

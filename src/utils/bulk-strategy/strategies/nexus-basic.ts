@@ -15,13 +15,30 @@ export const nexusEvenOdd: BulkStrategy = {
     settle: (ticks, spec) => settle(ticks, spec, d => spec.contract_type === 'DIGITEVEN' ? d % 2 === 0 : d % 2 === 1),
 };
 
-export const nexusRiseFall: BulkStrategy = {
-    id: 'nexus-rise-fall', label: 'Nexus Rise / Fall', description: 'Short continuation score for CALL or PUT.', minTicks: MIN, bufferSize: 120, ticksToSettle: 1,
-    contract: () => contract('CALL'),
-    evaluate: ticks => { const x = ticks.slice(-120).filter(valid); const up = x.slice(1).filter((q, i) => q > x[i]).length / Math.max(1, x.length - 1); return x.length < MIN ? out(false, up, `Need ${MIN} ticks, have ${x.length}.`) : out(Math.max(up, 1 - up) >= 0.54, Math.max(up, 1 - up), up >= 0.5 ? 'Rise selected.' : 'Fall selected.'); },
-    settle: (ticks, spec) => ticks.length < 2 ? undefined : spec.contract_type === 'CALL' ? ticks[1] > ticks[0] : ticks[1] < ticks[0],
+const directionalSignal = (ticks: readonly number[]): SignalResult => {
+    const x = ticks.slice(-120).filter(valid);
+    if (x.length < MIN) return { ...out(false, 0, `Need ${MIN} ticks, have ${x.length}.`) };
+    const recent = x.slice(-12);
+    const moves = recent.slice(1).map((quote, index) => Math.sign(quote - recent[index]));
+    const rises = moves.filter(move => move > 0).length;
+    const falls = moves.filter(move => move < 0).length;
+    const upRate = rises / moves.length;
+    const downRate = falls / moves.length;
+    const direction = upRate >= 0.67 ? 'CALL' : downRate >= 0.67 ? 'PUT' : null;
+    const score = Math.max(upRate, downRate);
+    if (!direction) return out(false, score, `No directional pattern: rises ${rises}/${moves.length}, falls ${falls}/${moves.length}.`);
+    return {
+        ...out(true, score, `${direction === 'CALL' ? 'Rise' : 'Fall'} pattern confirmed by ${direction === 'CALL' ? rises : falls}/${moves.length} recent moves.`),
+        contract: contract(direction),
+    };
 };
 
+export const nexusRiseFall: BulkStrategy = {
+    id: 'nexus-rise-fall', label: 'Nexus Rise / Fall', description: 'Pattern-confirmed one-tick Rise/Fall using the last 12 moves; it trades only when one direction has at least 67% of recent moves.', minTicks: MIN, bufferSize: 120, ticksToSettle: 1,
+    contract: () => contract('CALL'),
+    evaluate: directionalSignal,
+    settle: (ticks, spec) => ticks.length < 2 ? undefined : spec.contract_type === 'CALL' ? ticks[1] > ticks[0] : ticks[1] < ticks[0],
+};
 export const nexusOverUnder: BulkStrategy = {
     id: 'nexus-over-under', label: 'Nexus Over / Under', description: 'Last-digit threshold frequency.', minTicks: MIN, bufferSize: 120, ticksToSettle: 1,
     contract: () => contract('DIGITOVER', '4'),

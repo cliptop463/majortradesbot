@@ -181,7 +181,10 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
     };
 
     const confirmReal = () => {
-        if (!real_ack) return;
+        if (!real_ack) {
+            setErrorMsg(localize('Tick the acknowledgment box before enabling Live trading.'));
+            return;
+        }
         patch({ account: 'real' });
         setRealConfirmOpen(false);
     };
@@ -711,7 +714,13 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                     </p>
 
                     {real_confirm_open && (
-                        <div className='bulk-strategy-modal__warning' data-testid='dt_bulk_real_confirm' role='alertdialog'>
+                        <div
+                            className='bulk-strategy-modal__warning'
+                            data-testid='dt_bulk_real_confirm'
+                            role='alertdialog'
+                            onPointerDown={event => event.stopPropagation()}
+                            onMouseDown={event => event.stopPropagation()}
+                        >
                             <p>
                                 <strong>{localize('Enable Real account trading?')}</strong>
                             </p>
@@ -725,7 +734,10 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                     data-testid='dt_bulk_real_ack'
                                     type='checkbox'
                                     checked={real_ack}
-                                    onChange={e => setRealAck(e.target.checked)}
+                                    onChange={event => {
+                                        event.stopPropagation();
+                                        setRealAck(event.target.checked);
+                                    }}
                                 />
                                 <span>{localize('I understand and want to use a Real account.')}</span>
                             </label>
@@ -734,8 +746,10 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                     type='button'
                                     className='bulk-strategy-modal__button bulk-strategy-modal__button--danger'
                                     data-testid='dt_bulk_real_enable'
-                                    disabled={!real_ack}
-                                    onClick={confirmReal}
+                                    onClick={event => {
+                                        event.stopPropagation();
+                                        confirmReal();
+                                    }}
                                 >
                                     {localize('Enable Real')}
                                 </button>
@@ -743,7 +757,8 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                     type='button'
                                     className='bulk-strategy-modal__button'
                                     data-testid='dt_bulk_real_cancel'
-                                    onClick={() => {
+                                    onClick={event => {
+                                        event.stopPropagation();
                                         setRealConfirmOpen(false);
                                         setRealAck(false);
                                     }}
