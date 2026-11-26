@@ -475,16 +475,6 @@ const BulkStrategyModal: React.FC<Props> = ({
         return;
     }
 
-    const runProblems = override
-        ? validateConfig(override)
-        : problems;
-
-    if (runProblems.length) {
-        setErrorMsg(runProblems[0]);
-        startLock.current = false;
-        return;
-    }
-
     const context = getAccountContext();
 
     setAccountKind(context.kind);
@@ -674,15 +664,10 @@ const BulkStrategyModal: React.FC<Props> = ({
                 ? localize('Run Paper strategy')
                 : localize('Run Live strategy');
 
-    // Scanner activity does NOT disable the Run button.
-    const actionDisabled =
-        runState === 'starting' ||
-        runState === 'stopping' ||
-        (
-            runState === 'idle' &&
-            showSettings &&
-            problems.length > 0
-        );
+    // Scanner and configuration-risk warnings do not disable Run.
+const actionDisabled =
+    runState === 'starting' ||
+    runState === 'stopping';
 
     const handleAction = () =>
         runState === 'running'
