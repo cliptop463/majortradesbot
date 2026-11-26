@@ -115,15 +115,30 @@ describe('defaults and saved settings', () => {
         expect(screen.getByTestId('dt_bulk_disclaimer').textContent).toContain('No strategy changes the odds');
     });
 
+    it('preselects a reference strategy opened from the library', () => {
+        render(<BulkStrategyModal {...props()} initialStrategyId='tactics-weighted-frequency' />);
+
+        expect(screen.getByTestId('dt_bulk_strategy').value).toBe('tactics-weighted-frequency');
+        expect(screen.getByTestId('dt_bulk_account_demo').getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByTestId('dt_bulk_mode_paper').getAttribute('aria-pressed')).toBe('true');
+    });
+
     it('offers the volatility indices and the pluggable strategy list', () => {
         renderOpen(<BulkStrategyModal {...props()} />);
         const markets = Array.from(screen.getByTestId('dt_bulk_market').options).map(o => o.value);
         expect(markets).toEqual(expect.arrayContaining(['R_100', '1HZ100V']));
-        expect(Array.from(screen.getByTestId('dt_bulk_strategy').options).map(o => o.textContent)).toEqual([
-            'Tick Striker V3',
-            'Tick Striker V4',
-            'Last-Ticks Matches',
-        ]);
+        const strategyOptions = Array.from(screen.getByTestId('dt_bulk_strategy').options).map(o => o.textContent);
+        expect(strategyOptions).toEqual(
+            expect.arrayContaining([
+                'Tick Striker V3',
+                'Tick Striker V4',
+                'Nexus Digit Printer',
+                'Blueprint Recent Pattern (experimental)',
+                'ProAnalyser Digit Frequency (experimental)',
+                'Tactics Weighted Frequency (experimental)',
+                'Last-Ticks Matches',
+            ])
+        );
     });
 
     it('scans all volatility markets and selects the market with the highest initial score', async () => {

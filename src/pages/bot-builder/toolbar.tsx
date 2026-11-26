@@ -15,6 +15,7 @@ import WorkspaceGroup from './toolbar/workspace-group';
 import DigitScannerModal from './digit-scanner-modal';
 import MatchesDiffersModal from './matches-differs-modal';
 import BulkStrategyModal from './bulk-strategy-modal';
+import StrategyLibraryModal from './strategy-library-modal';
 import RepeatMatchesModal from './repeat-matches-modal';
 import TicksModal from './ticks-modal';
 
@@ -51,6 +52,8 @@ const Toolbar = observer(() => {
         React.useState(false);
 
     const [is_bulk_open, setIsBulkOpen] = React.useState(false);
+    const [is_strategy_library_open, setIsStrategyLibraryOpen] = React.useState(false);
+    const [selected_library_strategy_id, setSelectedLibraryStrategyId] = React.useState<string | null>(null);
     const [is_bulk_running, setIsBulkRunning] = React.useState(false);
     const [is_repeat_matches_open, setIsRepeatMatchesOpen] = React.useState(false);
     const [is_repeat_matches_running, setIsRepeatMatchesRunning] = React.useState(false);
@@ -159,6 +162,14 @@ const Toolbar = observer(() => {
                         is_bot_running={false}
                     />
                     <ToolbarButton
+                        popover_message={localize('Browse reference-inspired strategies and open one in the Paper-first Bulk Strategy setup.')}
+                        button_id='db-toolbar__strategy-library-button'
+                        button_classname='toolbar__btn toolbar__btn--icon toolbar__btn--digit-scanner'
+                        buttonOnClick={() => setIsStrategyLibraryOpen(true)}
+                        button_text={localize('Strategy Library')}
+                        is_bot_running={false}
+                    />
+                    <ToolbarButton
                         popover_message={localize("Buy a Matches contract on every tick using that tick's last digit, with five open contracts maximum.")}
                         button_id='db-toolbar__repeat-matches-button'
                         button_classname='toolbar__btn toolbar__btn--icon toolbar__btn--digit-scanner'
@@ -225,6 +236,16 @@ const Toolbar = observer(() => {
                 onClose={() => setIsBulkOpen(false)}
                 is_running={is_running}
                 onRunningChange={setIsBulkRunning}
+                initialStrategyId={selected_library_strategy_id}
+            />
+            <StrategyLibraryModal
+                isOpen={is_strategy_library_open}
+                onClose={() => setIsStrategyLibraryOpen(false)}
+                onUseStrategy={strategyId => {
+                    setSelectedLibraryStrategyId(strategyId);
+                    setIsStrategyLibraryOpen(false);
+                    setIsBulkOpen(true);
+                }}
             />
             <RepeatMatchesModal
                 isOpen={is_repeat_matches_open}

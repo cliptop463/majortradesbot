@@ -7,6 +7,7 @@ import { tickDirection } from './tick-direction';
 import { nexusTickStriker } from './nexus-tick-striker';
 import { nexusDigitPrinter, nexusOver8Sniper, nexusAutoSwitcher, nexusOver2Under7 } from './nexus-classic';
 import { nexusEvenOdd, nexusRiseFall, nexusOverUnder, nexusMatchesDiffers } from './nexus-basic';
+import { blueprintRecentPattern, proAnalyserFrequency, tacticsWeightedFrequency } from './reference-inspired';
 
 /** Add new strategies here. Each one only has to implement BulkStrategy. */
 export const STRATEGIES: Record<string, BulkStrategy> = {
@@ -23,6 +24,9 @@ export const STRATEGIES: Record<string, BulkStrategy> = {
     [nexusRiseFall.id]: nexusRiseFall,
     [nexusOverUnder.id]: nexusOverUnder,
     [nexusMatchesDiffers.id]: nexusMatchesDiffers,
+    [blueprintRecentPattern.id]: blueprintRecentPattern,
+    [proAnalyserFrequency.id]: proAnalyserFrequency,
+    [tacticsWeightedFrequency.id]: tacticsWeightedFrequency,
     [lastTicksMatches.id]: lastTicksMatches,
 };
 

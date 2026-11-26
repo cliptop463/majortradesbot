@@ -1,0 +1,188 @@
+.strategy-library-modal {
+    .dc-dialog__dialog {
+        width: min(76rem, calc(100vw - 2.4rem));
+        max-width: 76rem;
+        max-height: 90vh;
+        min-height: 0;
+    }
+
+    .dc-dialog__content {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+        max-width: 100%;
+        margin-bottom: 0.8rem;
+    }
+
+    &__content {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 1.2rem;
+        width: 100%;
+        min-height: 0;
+        max-height: 70vh;
+        overflow-y: auto;
+        padding: 0.8rem;
+        color: var(--text-prominent);
+    }
+
+    &__intro {
+        margin: 0;
+        color: var(--text-prominent);
+        font-size: 1.2rem;
+        line-height: 1.6;
+    }
+
+    &__layout {
+        display: grid;
+        grid-template-columns: minmax(20rem, 0.9fr) minmax(26rem, 1.1fr);
+        gap: 1.2rem;
+    }
+
+    &__list {
+        display: grid;
+        align-content: start;
+        gap: 0.6rem;
+    }
+
+    &__option {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.8rem;
+        min-height: 4.4rem;
+        padding: 0.8rem 1rem;
+        border: 1px solid var(--border-normal);
+        border-radius: 0.6rem;
+        background: var(--general-section-1);
+        color: var(--text-prominent);
+        font-size: 1.2rem;
+        font-weight: 600;
+        text-align: left;
+        cursor: pointer;
+
+        &:hover,
+        &:focus-visible {
+            border-color: var(--button-primary-default);
+            outline: 2px solid var(--button-primary-default);
+            outline-offset: 1px;
+        }
+
+        &--selected {
+            border: 2px solid var(--button-primary-default);
+            background: var(--general-section-2, var(--general-section-1));
+        }
+    }
+
+    &__option-label {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    &__badge {
+        flex: none;
+        padding: 0.3rem 0.6rem;
+        border: 1px solid var(--status-warning, #f0ad4e);
+        border-radius: 99rem;
+        background: var(--general-section-2, var(--general-section-1));
+        color: var(--text-prominent);
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    &__details {
+        padding: 1.2rem;
+        border: 2px solid var(--button-primary-default);
+        border-radius: 0.8rem;
+        background: var(--general-section-1);
+
+        h2 {
+            margin: 0 0 0.8rem;
+            color: var(--text-prominent);
+            font-size: 1.6rem;
+        }
+
+        p {
+            margin: 0;
+            color: var(--text-prominent);
+            font-size: 1.2rem;
+            line-height: 1.6;
+        }
+    }
+
+    &__facts {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.8rem;
+        margin: 1.2rem 0;
+
+        > div {
+            padding: 0.8rem;
+            border: 1px solid var(--border-normal);
+            border-radius: 0.5rem;
+            background: var(--general-main-1, transparent);
+        }
+
+        dt {
+            margin-bottom: 0.4rem;
+            color: var(--text-less-prominent);
+            font-size: 1rem;
+        }
+
+        dd {
+            margin: 0;
+            color: var(--text-prominent);
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+    }
+
+    &__source {
+        margin: 0 0 0.8rem !important;
+        color: var(--text-prominent) !important;
+        font-weight: 700;
+    }
+
+    &__use {
+        width: 100%;
+        min-height: 4.4rem;
+        padding: 0.8rem 1.2rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: var(--button-primary-default);
+        color: var(--text-colored-background, #fff);
+        font-size: 1.3rem;
+        font-weight: 700;
+        cursor: pointer;
+
+        &:focus-visible {
+            outline: 2px solid var(--text-prominent);
+            outline-offset: 2px;
+        }
+    }
+
+    &__notice {
+        margin: 0;
+        padding: 1rem;
+        border: 2px solid var(--status-warning, #f0ad4e);
+        border-radius: 0.6rem;
+        background: var(--general-section-1);
+        color: var(--text-prominent);
+        font-size: 1.1rem;
+        font-weight: 600;
+        line-height: 1.6;
+    }
+}
+
+@media (max-width: 640px) {
+    .strategy-library-modal {
+        &__layout {
+            grid-template-columns: minmax(0, 1fr);
+        }
+
+        &__facts {
+            grid-template-columns: 1fr;
+        }
+    }
+}

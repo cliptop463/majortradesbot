@@ -39,6 +39,7 @@ type Props = {
     is_running: boolean;
     /** Lets the toolbar show a "running" marker while the engine keeps going with the panel closed. */
     onRunningChange?: (running: boolean) => void;
+    initialStrategyId?: string | null;
 };
 
 type RunState = 'idle' | 'starting' | 'running' | 'stopping';
@@ -75,7 +76,7 @@ const downloadCsv = (logs: RoundLog[]) => {
 
 const money = (x: number) => (Number.isFinite(x) ? x.toFixed(2) : '–');
 
-const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRunningChange }) => {
+const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRunningChange, initialStrategyId }) => {
     const [base, setBase] = React.useState<BulkConfig>(() => loadConfig());
     const [text, setText] = React.useState<NumberText>(() => toText(loadConfig()));
     const [saved, setSaved] = React.useState(false);
@@ -147,6 +148,13 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
     React.useEffect(() => {
         if (isOpen) setAccountKind(getAccountContext().kind);
     }, [isOpen]);
+
+    React.useEffect(() => {
+        if (!isOpen || !initialStrategyId || !getStrategy(initialStrategyId)) return;
+        setBase(current => ({ ...current, strategyId: initialStrategyId }));
+        setShowSettings(true);
+        setSaved(false);
+    }, [isOpen, initialStrategyId]);
 
     const touch = () => setSaved(false);
     const patch = (changes: Partial<BulkConfig>) => {
