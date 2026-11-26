@@ -112,6 +112,7 @@ const BulkStrategyModal: React.FC<Props> = ({
     const engine = React.useRef<BulkEngine | null>(null);
     const mounted = React.useRef(true);
     const scanGeneration = React.useRef(0);
+    const startLock = React.useRef(false);
 
     const config: BulkConfig = React.useMemo(() => ({
         ...base,
@@ -506,50 +507,123 @@ const BulkStrategyModal: React.FC<Props> = ({
                                     : localize('Demo'),
                             active:
                                 context.kind === 'real'
-                                    ? localize('Real')
-                                    : localize('Demo'),
-                        }
-                    )
-                );
-                return;
-            }
+const start = async (override?: BulkConfig) => {
+    // Synchronous guard: prevents duplicate starts before React state updates.
+    if (startLock.current || isActive) return;
+
+    startLock.current = true;
+    setErrorMsg('');
+
+    const runConfig: BulkConfig = override ?? config;
+
+    // Scanner is independent of strategy execution.
+    // No scanner qualification or scanning state is required.
+
+    if (is_running) {
+        setErrorMsg(
+            localize(
+                'Stop the Blockly bot first. Bulk Strategy will not run beside it.'
+            )
+        );
+        startLock.current = false;
+        return;
+    }
+
+    const runProblems = override
+        ? validateConfig(override)
+        : problems;
+
+    if (runProblems.length) {
+        setErrorMsg(runProblems[0]);
+        startLock.current = false;
+        return;
+    }
+
+    const context = getAccountContext();
+
+    setAccountKind(context.kind);
+
+    if (runConfig.mode === 'live') {
+        if (!context.kind) {
+            setErrorMsg(
+                localize(
+                    'Log in first: Live mode needs an authorized account.'
+                )
+            );
+            startLock.current = false;
+            return;
         }
 
-        if (!override) {
-            const didSave = saveConfig(runConfig);
-            setSaved(didSave);
-
-            if (!didSave) {
-                setErrorMsg(
-                    localize(
-                        'Settings could not be saved in this browser. This run will still use the current settings.'
-                    )
-                );
-            }
+        if (context.kind !== runConfig.account) {
+            setErrorMsg(
+                localize(
+                    'You chose a {{chosen}} account but the app is logged in to a {{active}} account. Switch account in the app, then try again.',
+                    {
+                        chosen:
+                            runConfig.account === 'real'
+                                ? localize('Real')
+                                : localize('Demo'),
+                        active:
+                            context.kind === 'real'
+                                ? localize('Real')
+                                : localize('Demo'),
+                    }
+                )
+            );
+            startLock.current = false;
+            return;
         }
+    }
 
-        setRunningConfig(runConfig);
-        setLogs([]);
-        setSummary(null);
-        setTickInfo(null);
-        setRunState('starting');
+    if (!override) {
+        const didSave = saveConfig(runConfig);
+        setSaved(didSave);
 
-        const instance = new BulkEngine(
+        if (!didSave) {
+            setErrorMsg(
+                localize(
+                    'Settings could not be saved in this browser. This run will still use the current settings.'
+                )
+            );
+        }
+    }
+
+    setRunningConfig(runConfig);
+    setLogs([]);
+    setSummary(null);
+    setTickInfo(null);
+    setRunState('starting');
+
+    let instance: BulkEngine | null = null;
+
+    try {
+        instance = new BulkEngine(
             runConfig,
             createDerivApi(),
             {
-                onStatus: status =>
-                    mounted.current && setEngineStatus(status),
+                onStatus: status => {
+                    if (mounted.current) {
+                        setEngineStatus(status);
+                    }
+                },
 
-                onTick: info =>
-                    mounted.current && setTickInfo(info),
+                onTick: info => {
+                    if (mounted.current) {
+                        setTickInfo(info);
+                    }
+                },
 
-                onRound: log =>
-                    mounted.current &&
-                    setLogs(current => [...current, log]),
+                onRound: log => {
+                    if (mounted.current) {
+                        setLogs(current => [...current, log]);
+                    }
+                },
 
-                onError: message =>
-                    mounted.current && setErrorMsg(message),
+                onError: message => {
+                    if (mounted.current) {
+                        setErrorMsg(message);
+                    }
+                },
 
                 onStop: result => {
                     if (!mounted.current) return;
@@ -557,6 +631,7 @@ const BulkStrategyModal: React.FC<Props> = ({
                     setSummary(result);
                     setRunState('idle');
                     setEngineStatus('stopped');
+                    startLock.current = false;
                 },
             },
             { currency: context.currency }
@@ -564,28 +639,43 @@ const BulkStrategyModal: React.FC<Props> = ({
 
         engine.current = instance;
 
-        try {
-            await instance.start();
+        await instance.start();
 
-            if (mounted.current) {
-                setRunState(current =>
-                    current === 'starting'
-                        ? 'running'
-                        : current
-                );
-            }
-        } catch (error) {
-            if (mounted.current) {
-                setErrorMsg(
-                    error instanceof Error
-                        ? error.message
-                        : String(error)
-                );
+        if (mounted.current) {
+            setRunState(current =>
+                current === 'starting'
+                    ? 'running'
+                    : current
+            );
+        }
+    } catch (error) {
+        if (mounted.current) {
+            setErrorMsg(
+                error instanceof Error
+                    ? error.message
+                    : String(error)
+            );
 
-                setRunState('idle');
+            setRunState('idle');
+            setEngineStatus('stopped');
+        }
+
+        startLock.current = false;
+
+        // Clean up any engine instance that failed during startup.
+        if (instance) {
+            try {
+                await instance.stop('Startup failed');
+            } catch {
+                // Ignore secondary cleanup errors.
             }
         }
-    };
+
+        if (engine.current === instance) {
+            engine.current = null;
+        }
+    }
+};
 
     const stop = async () => {
         if (!engine.current || runState === 'stopping') return;
