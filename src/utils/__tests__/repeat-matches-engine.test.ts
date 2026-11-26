@@ -41,4 +41,25 @@ describe('RepeatMatchesEngine', () => {
         expect(api.sent.find(request => request.proposal)).toMatchObject({ underlying_symbol: 'R_100', contract_type: 'DIGITMATCH', barrier: '5' });
         await engine.stop();
     });
+
+    it('ignores ticks from another market or subscription', async () => {
+        const api = new FakeApi();
+        api.responders.push(request =>
+            request.ticks_history ? { history: { pip_size: 2 }, subscription: { id: 'tick-sub' } } : undefined
+        );
+        const placed: number[] = [];
+        const engine = new RepeatMatchesEngine({ symbol: 'R_100', stake: 0.35, mode: 'paper' }, api, {
+            onContract: info => info.status === 'placed' && placed.push(info.digit),
+        });
+
+        await engine.start();
+        api.emit({ msg_type: 'tick', tick: { symbol: 'R_50', quote: 123.45 }, subscription: { id: 'tick-sub' } });
+        api.emit({ msg_type: 'tick', tick: { symbol: 'R_100', quote: 123.46 }, subscription: { id: 'other-sub' } });
+        api.emit({ msg_type: 'tick', tick: { symbol: 'R_100', quote: 123.47 } });
+        api.emit({ msg_type: 'tick', tick: { symbol: 'R_100', quote: 123.48 }, subscription: { id: 'tick-sub' } });
+        await flush();
+
+        expect(placed).toEqual([8]);
+        await engine.stop();
+    });
 });

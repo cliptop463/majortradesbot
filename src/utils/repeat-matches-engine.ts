@@ -75,8 +75,10 @@ export class RepeatMatchesEngine {
 
     private onMessage(data: any) {
         if (!this.running || !data) return;
-        if (data.msg_type === 'tick' && data.tick && (!this.tickSubscription || !data.subscription?.id || data.subscription.id === this.tickSubscription)) {
-            void this.onTick(data.tick);
+        if (data.msg_type === 'tick' && data.tick) {
+            const isMarketTick = data.tick.symbol === this.config.symbol;
+            const isSubscriptionTick = !this.tickSubscription || data.subscription?.id === this.tickSubscription;
+            if (isMarketTick && isSubscriptionTick) void this.onTick(data.tick);
             return;
         }
         if (data.msg_type === 'proposal_open_contract' && data.proposal_open_contract) {
