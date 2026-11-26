@@ -454,7 +454,7 @@ const BulkStrategyModal: React.FC<Props> = ({
     // Scanner qualification is intentionally NOT used here.
     // ============================================================
 
-    const start = async (override?: BulkConfig) => {
+const start = async (override?: BulkConfig) => {
         if (isActive) return;
 
         setErrorMsg('');
