@@ -631,6 +631,130 @@ const start = async (override?: BulkConfig) => {
                     setSummary(result);
                     setRunState('idle');
                     setEngineStatus('stopped');
+const start = async (override?: BulkConfig) => {
+    // Synchronous guard: prevents duplicate starts before React state updates.
+    if (startLock.current || isActive) return;
+
+    startLock.current = true;
+    setErrorMsg('');
+
+    const runConfig: BulkConfig = override ?? config;
+
+    // Scanner is independent of strategy execution.
+    // No scanner qualification or scanning state is required.
+
+    if (is_running) {
+        setErrorMsg(
+            localize(
+                'Stop the Blockly bot first. Bulk Strategy will not run beside it.'
+            )
+        );
+        startLock.current = false;
+        return;
+    }
+
+    const runProblems = override
+        ? validateConfig(override)
+        : problems;
+
+    if (runProblems.length) {
+        setErrorMsg(runProblems[0]);
+        startLock.current = false;
+        return;
+    }
+
+    const context = getAccountContext();
+
+    setAccountKind(context.kind);
+
+    if (runConfig.mode === 'live') {
+        if (!context.kind) {
+            setErrorMsg(
+                localize(
+                    'Log in first: Live mode needs an authorized account.'
+                )
+            );
+            startLock.current = false;
+            return;
+        }
+
+        if (context.kind !== runConfig.account) {
+            setErrorMsg(
+                localize(
+                    'You chose a {{chosen}} account but the app is logged in to a {{active}} account. Switch account in the app, then try again.',
+                    {
+                        chosen:
+                            runConfig.account === 'real'
+                                ? localize('Real')
+                                : localize('Demo'),
+                        active:
+                            context.kind === 'real'
+                                ? localize('Real')
+                                : localize('Demo'),
+                    }
+                )
+            );
+            startLock.current = false;
+            return;
+        }
+    }
+
+    if (!override) {
+        const didSave = saveConfig(runConfig);
+        setSaved(didSave);
+
+        if (!didSave) {
+            setErrorMsg(
+                localize(
+                    'Settings could not be saved in this browser. This run will still use the current settings.'
+                )
+            );
+        }
+    }
+
+    setRunningConfig(runConfig);
+    setLogs([]);
+    setSummary(null);
+    setTickInfo(null);
+    setRunState('starting');
+
+    let instance: BulkEngine | null = null;
+
+    try {
+        instance = new BulkEngine(
+            runConfig,
+            createDerivApi(),
+            {
+                onStatus: status => {
+                    if (mounted.current) {
+                        setEngineStatus(status);
+                    }
+                },
+
+                onTick: info => {
+                    if (mounted.current) {
+                        setTickInfo(info);
+                    }
+                },
+
+                onRound: log => {
+                    if (mounted.current) {
+                        setLogs(current => [...current, log]);
+                    }
+                },
+
+                onError: message => {
+                    if (mounted.current) {
+                        setErrorMsg(message);
+                    }
+                },
+
+                onStop: result => {
+                    if (!mounted.current) return;
+
+                    setSummary(result);
+                    setRunState('idle');
+                    setEngineStatus('stopped');
                     startLock.current = false;
                 },
             },
