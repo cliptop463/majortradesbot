@@ -430,7 +430,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                       'Choose a strategy and market, set your stake and stop limits, then start. Paper is selected by default and places no orders. Your current settings are saved automatically when you start.'
                                   )
                                 : localize(
-                                      'Runs {{n}} Paper rounds on real ticks. It places no orders and uses no money. Nothing to set up.',
+                                      'The one-tap test always runs {{n}} Demo + Paper rounds and places no orders. To place Live orders, log in to a Real Deriv account, then open account and mode settings and select Real + Live.',
                                       { n: QUICK_ROUNDS }
                                   )}
                         </p>
@@ -463,7 +463,7 @@ const BulkStrategyModal: React.FC<Props> = ({ isOpen, onClose, is_running, onRun
                                 disabled={is_busy}
                                 onClick={() => setShowSettings(v => !v)}
                             >
-                                {show_settings ? localize('Hide settings') : localize('Show settings')}
+                                {show_settings ? localize('Hide settings') : localize('Configure account and mode')}
                             </button>
                             {show_settings && (
                                 <button

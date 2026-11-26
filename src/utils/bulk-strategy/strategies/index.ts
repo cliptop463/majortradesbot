@@ -2,6 +2,8 @@ import type { BulkStrategy } from '../types';
 import { lastTicksMatches } from './last-ticks-matches';
 import { tickStriker } from './tick-striker';
 import { tickStrikerV4 } from './tick-striker-v4';
+import { tickStrikerV4Directional } from './tick-striker-v4-directional';
+import { tickDirection } from './tick-direction';
 import { nexusTickStriker } from './nexus-tick-striker';
 import { nexusDigitPrinter, nexusOver8Sniper, nexusAutoSwitcher, nexusOver2Under7 } from './nexus-classic';
 import { nexusEvenOdd, nexusRiseFall, nexusOverUnder, nexusMatchesDiffers } from './nexus-basic';
@@ -10,6 +12,8 @@ import { nexusEvenOdd, nexusRiseFall, nexusOverUnder, nexusMatchesDiffers } from
 export const STRATEGIES: Record<string, BulkStrategy> = {
     [tickStriker.id]: tickStriker,
     [tickStrikerV4.id]: tickStrikerV4,
+    [tickStrikerV4Directional.id]: tickStrikerV4Directional,
+    [tickDirection.id]: tickDirection,
     [nexusTickStriker.id]: nexusTickStriker,
     [nexusDigitPrinter.id]: nexusDigitPrinter,
     [nexusOver8Sniper.id]: nexusOver8Sniper,

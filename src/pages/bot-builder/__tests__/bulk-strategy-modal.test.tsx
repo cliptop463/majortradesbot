@@ -480,6 +480,21 @@ describe('quick test (the simple path)', () => {
         expect(screen.getByTestId('dt_bulk_run').disabled).toBe(false);
         expect(screen.queryByTestId('dt_bulk_stake')).toBeNull();
         expect(screen.queryByTestId('dt_bulk_risk_high')).toBeNull();
+        expect(screen.getByTestId('dt_bulk_setup').textContent).toContain('always runs 5 Demo + Paper rounds');
+        expect(screen.getByTestId('dt_bulk_toggle_settings').textContent).toBe('Configure account and mode');
+    });
+
+    it('can open account and mode controls from the quick-test view and select Real + Live', () => {
+        render(<BulkStrategyModal {...props()} />);
+        fireEvent.click(screen.getByTestId('dt_bulk_toggle_settings'));
+        fireEvent.click(screen.getByTestId('dt_bulk_account_real'));
+        fireEvent.click(screen.getByTestId('dt_bulk_real_ack'));
+        fireEvent.click(screen.getByTestId('dt_bulk_real_enable'));
+        fireEvent.click(screen.getByTestId('dt_bulk_mode_live'));
+
+        expect(screen.getByTestId('dt_bulk_account_real').getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByTestId('dt_bulk_mode_live').getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByTestId('dt_bulk_run').textContent).toBe('Run Live strategy');
         expect(screen.getByTestId('dt_bulk_setup').textContent).toContain('places no orders');
     });
 
