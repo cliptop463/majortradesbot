@@ -175,14 +175,27 @@
 
     &__check {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         gap: 0.8rem;
         margin: 0.8rem 0;
+        padding: 0.8rem;
+        border: 1px solid var(--status-danger, #ec3f3f);
+        border-radius: 0.4rem;
+        background: var(--general-section-1, transparent);
         font-size: 1.2rem;
 
         input {
             flex: none;
-            margin-top: 0.2rem;
+            width: 2rem;
+            height: 2rem;
+            margin: 0;
+            accent-color: var(--status-danger, #ec3f3f);
+            cursor: pointer;
+
+            &:focus-visible {
+                outline: 2px solid var(--text-prominent);
+                outline-offset: 2px;
+            }
         }
     }
 
@@ -222,8 +235,10 @@
     &__warning {
         margin: 0.8rem 0;
         padding: 0.8rem;
-        border: 1px solid var(--status-danger, #ec3f3f);
+        border: 2px solid var(--status-danger, #ec3f3f);
         border-radius: 0.4rem;
+        background: var(--general-section-1, transparent);
+        color: var(--text-prominent);
         font-size: 1.2rem;
     }
 
